@@ -132,15 +132,48 @@ Neben `latest` gibt es zu jedem Commit ein Tag `sha-<kurzer-hash>`.
 
 | Situation                                                | Reaktion                                                                 |
 | -------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Erwähnung, Antwort auf Klotzi, DM, „Klotzi“ irgendwo im Text (auch „Klotzis“, „Klotzilein“) | Liest die letzten Nachrichten, antwortet per OpenAI, spielt **immer** eine Animation (wählt das Modell keine, hüpft er fröhlich) |
+| Erwähnung, Antwort auf Klotzi, DM, „Klotzi“ irgendwo im Text (auch „Klotzis“, „Klotzilein“) | Liest den **ganzen Verlauf der letzten 24 Stunden** plus sein Gedächtnis, antwortet per OpenAI, spielt **immer** eine Animation (wählt das Modell keine, hüpft er fröhlich) |
 | „Klotzi“ während des Cooldowns (3 s pro User)            | keine neue OpenAI-Anfrage, aber Klotzi hüpft im Call trotzdem             |
 | Nachricht in einem `KLOTZI_CHAT_CHANNELS`-Kanal          | antwortet immer                                                          |
+| eine der nächsten **2 Nachrichten** nach Klotzis eigener Antwort (ohne „Klotzi“) | **Nachlauschen**: die Decisions API prüft, ob sich die Nachricht noch auf ihn bezieht – wenn ja, antwortet er |
 | beliebige andere Nachricht (Chance `KLOTZI_AMBIENT_CHANCE`) | spontane Reaktion: Emoji + Animation, selten ein kurzer Kommentar       |
 | jede Nachricht                                           | Klotzi spitzt im Call kurz die Ohren                                     |
 | während OpenAI rechnet                                   | Klotzi legt im Call nachdenklich den Kopf schief                          |
 
 Seine Antworten erscheinen zusätzlich als **Sprechblase** über seinem Kopf (mit Mundbewegung).
 Nach drei Minuten ohne Ereignis rollt er sich zusammen und schläft, bis wieder etwas passiert.
+
+### Wer ist Klotzi?
+
+Ein 5 Meter großer Höllenhund aus dem **Warp** – eine Fantasy-Kreatur aus einem Warhammer-40k-Universum.
+Beschworen hat ihn der Psioniker **Manael** (im Chat `mseiche`), den Klotzi über alle Maßen lieb hat:
+sein Herrchen und allerbester Freund. Die komplette Persona steht in
+[`bot/src/core/persona.ts`](bot/src/core/persona.ts).
+
+### Gedächtnis und Verlauf
+
+- **Kurzzeitgedächtnis:** Für jede Antwort sieht Klotzi den kompletten Chatverlauf des Kanals der
+  letzten `KLOTZI_HISTORY_HOURS` Stunden (Standard 24) mit Uhrzeiten. Der Verlauf wird beim ersten
+  Mal pro Kanal über die Discord-API nachgeladen und danach live mitgeschrieben (inkl. Bearbeitungen
+  und Löschungen). Obergrenzen: `KLOTZI_HISTORY_MAX_MESSAGES` (500) und `KLOTZI_HISTORY_MAX_CHARS` (60 000).
+- **Langzeitgedächtnis:** Klotzi pflegt selbst eine `MEMORY.md` in `KLOTZI_DATA_DIR`
+  (im Docker-Image im Volume `/app/data`), die Neustarts übersteht und in **jedem** Prompt steht.
+  Mit den Tools `remember`, `revise_memory` und `forget_memory` legt er Erinnerungen mit einer
+  Wichtigkeit (★ bis ★★★) an, frischt sie auf oder löscht sie. Die Datei ist lesbares Markdown und
+  darf auch von Hand bearbeitet werden.
+- **Vergessen:** Das Gedächtnis ist auf `KLOTZI_MEMORY_MAX_ENTRIES` Einträge (80) und
+  `KLOTZI_MEMORY_MAX_CHARS` Zeichen (8 000) begrenzt. Wird es voll, wird die Erinnerung mit der
+  geringsten Relevanz verdrängt – Relevanz = Wichtigkeit × 30 Tage − Tage seit der letzten Bestätigung.
+  Alte Fakten aus dem früheren `memory.json` werden beim ersten Start automatisch übernommen.
+
+### Nachlauschen
+
+Nachdem Klotzi etwas geschrieben hat, hört er im selben Kanal noch die nächsten
+`KLOTZI_FOLLOW_UP_MESSAGES` Nachrichten (2) mit – höchstens `KLOTZI_FOLLOW_UP_MINUTES` Minuten lang (15).
+Für jede dieser Nachrichten fragt er die **OpenAI Decisions API** (`OPENAI_DECISION_MODEL`,
+Standard `gpt-6-luna`) mit einer Ja/Nein-Frage (*predicate*), ob sie sich auf ihn bezieht. Liegt die
+Wahrscheinlichkeit über `KLOTZI_FOLLOW_UP_THRESHOLD` (0,5), antwortet er – auch ohne dass sein Name fällt.
+Jede Antwort öffnet das Lauschfenster neu.
 
 ### Mitgelieferte Skills
 
@@ -152,7 +185,7 @@ Nach drei Minuten ohne Ereignis rollt er sich zusammen und schläft, bis wieder 
 | `fetch`  | `/stoeckchen` – Klotzi rennt im Call los und bringt das Stöckchen zurück                |
 | `dice`   | `/wuerfeln` und Tool `roll_dice` (`d20`, `2d6+3`, …) mit echten Zufallszahlen          |
 | `clock`  | Tool `get_time` für Uhrzeit und Datum in beliebigen Zeitzonen                          |
-| `memory` | Tools `remember_fact` / `forget_facts`: Klotzi merkt sich Dinge über die Leute         |
+| `memory` | Tools `remember` / `revise_memory` / `forget_memory`: Klotzi pflegt seine `MEMORY.md`     |
 | `voice`  | Geht automatisch in den Sprach-Channel, in dem die meisten sind, und verlässt ihn, wenn er leer ist; spielt dort die Geräusche zu seinen Animationen |
 
 Der Voice-Skill braucht keine Audiodateien und kein FFmpeg: Die Geräusche werden wie in der
@@ -181,7 +214,7 @@ Ein Skill kann beliebig viele dieser Bausteine kombinieren:
 | `setup`     | einmalig beim Start, z. B. um auf Bühnen-Events (`pet`, `join`) zu hören                |
 
 Über den Kontext hat jeder Skill Zugriff auf den Discord-Client, OpenAI, einen persistenten
-JSON-Speicher (`ctx.store`) und die **Bühne** (`ctx.stage.animate(...)`, `ctx.stage.say(...)`).
+JSON-Speicher (`ctx.store`), Klotzis Gedächtnis (`ctx.memory`) und die **Bühne** (`ctx.stage.animate(...)`, `ctx.stage.say(...)`).
 
 Beispiel – ein Wetter-Skill (`bot/src/skills/weather.ts`):
 

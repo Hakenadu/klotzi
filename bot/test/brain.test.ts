@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type OpenAI from 'openai';
@@ -7,6 +10,7 @@ import { createLogger } from '../src/core/logger.ts';
 import type { KlotziContext } from '../src/core/skill.ts';
 import { defineSkill } from '../src/core/skill.ts';
 import { SkillRegistry } from '../src/core/skill-registry.ts';
+import { Memory } from '../src/core/memory.ts';
 import { Stage } from '../src/core/stage.ts';
 import emote from '../src/skills/emote.ts';
 
@@ -30,12 +34,13 @@ const message = (text: string) => ({ type: 'message', role: 'assistant', content
 const call = (call_id: string, name: string, args: string) => ({ type: 'function_call', call_id, name, arguments: args });
 const reasoning = { type: 'reasoning', id: 'rs_1', summary: [], encrypted_content: 'geheim' };
 
-function context(openai: OpenAI, stage = new Stage()): KlotziContext {
+function context(openai: OpenAI, stage = new Stage(), memory?: Memory): KlotziContext {
   return {
     client: {} as any,
-    config: { openai: { model: 'gpt-6-luna', maxTokens: 100, reasoningEffort: 'low' } } as any,
+    config: { openai: { model: 'gpt-6-luna', decisionModel: 'gpt-6-luna', maxTokens: 100, reasoningEffort: 'low' } } as any,
     openai,
     stage,
+    memory: memory ?? new Memory(fs.mkdtempSync(path.join(os.tmpdir(), 'klotzi-')), { maxEntries: 10, maxChars: 1000 }),
     log: createLogger('test'),
     store: () => {
       throw new Error('kein Store im Test');
@@ -110,4 +115,60 @@ test('spontane Reaktionen nutzen strukturierte Ausgabe', async () => {
   );
   assert.deepEqual(reaction, { animation: 'dance', emoji: '🎶', comment: null });
   assert.equal(requests[0].text.format.type, 'json_schema');
+});
+
+test('Gedächtnis und Zeitstempel landen im Prompt', async () => {
+  const requests: any[] = [];
+  const openai = fakeOpenAI([[message('Wuff!')]], requests);
+  const memory = new Memory(fs.mkdtempSync(path.join(os.tmpdir(), 'klotzi-')), { maxEntries: 10, maxChars: 1000 });
+  memory.add('mseiche hat Klotzi aus dem Warp beschworen', 3);
+  const at = Date.UTC(2026, 10, 7, 13, 3);
+  await new Brain(context(openai, new Stage(), memory), new SkillRegistry()).reply(
+    { guildId: '1', channelId: 'c', userId: '42', userName: 'mseiche' },
+    [
+      { author: 'mseiche', fromKlotzi: false, content: 'Na, Klotzi?', at },
+      { author: 'Klotzi', fromKlotzi: true, content: 'Wuff!', at },
+    ],
+  );
+  const [req] = requests;
+  assert.match(req.instructions, /#1 ★★★ mseiche hat Klotzi aus dem Warp beschworen/);
+  assert.match(req.instructions, /Discord-ID 42/);
+  assert.match(req.instructions, /Manael/);
+  assert.deepEqual(req.input, [
+    { role: 'user', content: '[Sa., 14:03] mseiche: Na, Klotzi?' },
+    { role: 'assistant', content: 'Wuff!' },
+  ]);
+});
+
+test('isAboutKlotzi fragt die Decisions API und liefert die Wahrscheinlichkeit', async () => {
+  const bodies: any[] = [];
+  const decide = (answers: unknown[]) =>
+    ({
+      decisions: {
+        create: async (body: unknown) => {
+          bodies.push(body);
+          return { answers, model: 'gpt-6-luna', usage: {} };
+        },
+      },
+    }) as unknown as OpenAI;
+  const history = [
+    { author: 'Klotzi', fromKlotzi: true, content: 'Willst du ein Stöckchen werfen?' },
+    { author: 'Lisa', fromKlotzi: false, content: 'Ja, fang!' },
+  ];
+
+  const yes = new Brain(context(decide([{ type: 'predicate', name: 'addressed_to_klotzi', probability: 0.92 }])), new SkillRegistry());
+  assert.equal(await yes.isAboutKlotzi(history), 0.92);
+  const [body] = bodies;
+  assert.equal(body.model, 'gpt-6-luna');
+  assert.equal(body.questions[0].type, 'predicate');
+  assert.deepEqual(body.input.slice(1), [
+    { role: 'assistant', content: 'Willst du ein Stöckchen werfen?' },
+    { role: 'user', content: 'Lisa: Ja, fang!' },
+  ]);
+
+  const refused = new Brain(context(decide([{ type: 'refusal', name: 'addressed_to_klotzi' }])), new SkillRegistry());
+  assert.equal(await refused.isAboutKlotzi(history), 0);
+  // letzte Nachricht von Klotzi selbst → gar nicht erst fragen
+  assert.equal(await refused.isAboutKlotzi(history.slice(0, 1)), 0);
+  assert.equal(bodies.length, 2);
 });

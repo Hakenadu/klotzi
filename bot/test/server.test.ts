@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import type { AddressInfo } from 'node:net';
@@ -6,6 +9,7 @@ import WebSocket from 'ws';
 import type { StageEvent } from '@klotzi/shared';
 import { createLogger } from '../src/core/logger.ts';
 import type { KlotziContext } from '../src/core/skill.ts';
+import { Memory } from '../src/core/memory.ts';
 import { Stage } from '../src/core/stage.ts';
 import { startServer } from '../src/server.ts';
 
@@ -21,6 +25,7 @@ function context(stage: Stage): KlotziContext {
     } as any,
     openai: {} as any,
     stage,
+    memory: new Memory(fs.mkdtempSync(path.join(os.tmpdir(), 'klotzi-')), { maxEntries: 10, maxChars: 1000 }),
     log: createLogger('test'),
     store: () => {
       throw new Error();

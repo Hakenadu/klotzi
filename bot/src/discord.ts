@@ -11,6 +11,7 @@ import {
   type Message,
 } from 'discord.js';
 import type { Brain, ChatLine } from './core/brain.ts';
+import { ChatLog, type LoggedMessage } from './core/chat-log.ts';
 import type { KlotziContext, Situation } from './core/skill.ts';
 import { commandJson, type SkillRegistry } from './core/skill-registry.ts';
 
@@ -56,6 +57,9 @@ export function splitMessage(text: string, limit = 2000): string[] {
 export class KlotziBot {
   private readonly userCooldowns = new Map<string, number>();
   private readonly ambientCooldowns = new Map<string, number>();
+  /** Kanäle, in denen Klotzi nach einer eigenen Nachricht noch mitlauscht. */
+  private readonly listening = new Map<string, { remaining: number; until: number }>();
+  private readonly chatLog: ChatLog;
   private readonly log;
 
   constructor(
@@ -64,6 +68,12 @@ export class KlotziBot {
     private readonly brain: Brain,
   ) {
     this.log = ctx.log.child('discord');
+    const { chat } = ctx.config;
+    this.chatLog = new ChatLog({
+      hours: chat.historyHours,
+      maxMessages: chat.historyMaxMessages,
+      maxChars: chat.historyMaxChars,
+    });
   }
 
   attach(): void {
@@ -73,8 +83,14 @@ export class KlotziBot {
       await this.registerCommands().catch((err) => this.log.error('Slash-Commands konnten nicht registriert werden', err));
     });
     client.on(Events.MessageCreate, (message) => {
+      // alles mitschreiben – auch Klotzis eigene Nachrichten und andere Bots
+      this.record(message);
       this.onMessage(message).catch((err) => this.log.error('Fehler bei Nachricht', err));
     });
+    client.on(Events.MessageUpdate, (_old, message) => {
+      if (!message.partial) this.chatLog.edit(message.channelId, message.id, this.cleanContent(message));
+    });
+    client.on(Events.MessageDelete, (message) => this.chatLog.remove(message.channelId, message.id));
     client.on(Events.InteractionCreate, (interaction) => {
       this.onInteraction(interaction).catch((err) => this.log.error('Fehler bei Interaktion', err));
     });
@@ -137,7 +153,7 @@ export class KlotziBot {
 
     if (await this.skills.runMessageHooks(message, this.ctx)) return;
 
-    if (this.isAddressed(message)) {
+    if (this.isAddressed(message) || (await this.isFollowUp(message))) {
       if (this.onCooldown(this.userCooldowns, message.author.id, this.ctx.config.chat.userCooldown)) {
         // keine neue OpenAI-Anfrage, aber in der Activity reagiert Klotzi trotzdem
         stage.animate(message.guildId, 'happy');
@@ -147,6 +163,46 @@ export class KlotziBot {
     } else if (message.guildId && Math.random() < this.ctx.config.chat.ambientChance) {
       if (this.onCooldown(this.ambientCooldowns, message.channelId, this.ctx.config.chat.ambientCooldown)) return;
       await this.react(message);
+    }
+  }
+
+  // ───────────────────────────── Nachlauschen ─────────────────────────────
+
+  /** Nachdem Klotzi etwas gesagt hat, hört er noch ein paar Nachrichten lang genauer hin. */
+  private listen(channelId: string): void {
+    const { followUpMessages, followUpMinutes } = this.ctx.config.chat;
+    if (followUpMessages <= 0) return;
+    const until = followUpMinutes > 0 ? Date.now() + followUpMinutes * 60_000 : Infinity;
+    this.listening.set(channelId, { remaining: followUpMessages, until });
+  }
+
+  /** Zählt eine Nachricht vom Lausch-Kontingent ab. `true`, wenn Klotzi noch zuhört. */
+  private consumeListening(channelId: string): boolean {
+    const state = this.listening.get(channelId);
+    if (!state) return false;
+    if (Date.now() > state.until) {
+      this.listening.delete(channelId);
+      return false;
+    }
+    if (--state.remaining <= 0) this.listening.delete(channelId);
+    return true;
+  }
+
+  /**
+   * Bezieht sich eine Nachricht ohne "Klotzi" trotzdem auf ihn? Wird nur kurz
+   * nach Klotzis eigenen Nachrichten über die Decisions API geprüft.
+   */
+  private async isFollowUp(message: Message): Promise<boolean> {
+    if (!this.consumeListening(message.channelId)) return false;
+    try {
+      const history = await this.history(message, this.ctx.config.chat.historyLimit);
+      const probability = await this.brain.isAboutKlotzi(history);
+      const yes = probability >= this.ctx.config.chat.followUpThreshold;
+      this.log.debug(`Nachlauschen: "${message.content.slice(0, 60)}" → ${probability.toFixed(2)} (${yes ? 'antworten' : 'ignorieren'})`);
+      return yes;
+    } catch (err) {
+      this.log.warn('Nachlauschen fehlgeschlagen', err);
+      return false;
     }
   }
 
@@ -167,20 +223,52 @@ export class KlotziBot {
     };
   }
 
-  /** Liest die letzten Nachrichten des Kanals als Kontext für das Gehirn. */
-  private async history(message: Message): Promise<ChatLine[]> {
-    const limit = Math.max(1, this.ctx.config.chat.historyLimit);
-    const before = await message.channel.messages
-      .fetch({ limit: limit - 1, before: message.id })
-      .catch(() => new Map<string, Message>());
-    const messages = [...before.values(), message]
-      .filter((m) => m.content.trim())
-      .sort((a, b) => a.createdTimestamp - b.createdTimestamp);
-    return messages.map((m) => ({
+  // ───────────────────────────── Verlauf ─────────────────────────────
+
+  private toLogged(m: Message): LoggedMessage {
+    return {
+      id: m.id,
+      at: m.createdTimestamp,
       author: m.member?.displayName ?? m.author.displayName,
-      fromKlotzi: m.author.id === this.ctx.client.user!.id,
+      fromKlotzi: m.author.id === this.ctx.client.user?.id,
       content: this.cleanContent(m),
-    }));
+    };
+  }
+
+  private record(message: Message): void {
+    if (message.system) return;
+    const line = this.toLogged(message);
+    if (line.content.trim()) this.chatLog.record(message.channelId, line);
+  }
+
+  /** Lädt einmalig pro Kanal die Nachrichten der letzten Stunden über die Discord-API nach. */
+  private async backfill(message: Message, since: number): Promise<LoggedMessage[]> {
+    const max = this.ctx.config.chat.historyMaxMessages;
+    const lines: LoggedMessage[] = [];
+    let before: string | undefined;
+    while (lines.length < max) {
+      const batch = await message.channel.messages.fetch({ limit: Math.min(100, max - lines.length), before });
+      if (batch.size === 0) break;
+      let reachedEnd = false;
+      for (const m of batch.values()) {
+        if (m.createdTimestamp < since) {
+          reachedEnd = true;
+          continue;
+        }
+        if (m.system) continue;
+        const line = this.toLogged(m);
+        if (line.content.trim()) lines.push(line);
+      }
+      if (reachedEnd || batch.size < 100) break;
+      before = batch.last()!.id;
+    }
+    this.log.debug(`Verlauf für #${message.channelId} nachgeladen: ${lines.length} Nachrichten`);
+    return lines;
+  }
+
+  /** Der Chatverlauf als Kontext für das Gehirn: die letzten Stunden, oder nur die letzten `limit` Nachrichten. */
+  private async history(message: Message, limit?: number): Promise<ChatLine[]> {
+    return this.chatLog.recent(message.channelId, (since) => this.backfill(message, since), limit);
   }
 
   private cleanContent(message: Message): string {
@@ -208,6 +296,7 @@ export class KlotziBot {
       const [first, ...rest] = splitMessage(answer);
       if (first) await message.reply({ content: first, allowedMentions: { repliedUser: false } });
       for (const part of rest) if (message.channel.isSendable()) await message.channel.send(part);
+      this.listen(message.channelId);
     } catch (err) {
       log.error('Antwort fehlgeschlagen', err);
       stage.animate(message.guildId, 'confused');
@@ -222,13 +311,17 @@ export class KlotziBot {
   private async react(message: Message): Promise<void> {
     const { stage, log } = this.ctx;
     try {
-      const reaction = await this.brain.react(this.situation(message), await this.history(message));
+      const reaction = await this.brain.react(
+        this.situation(message),
+        await this.history(message, this.ctx.config.chat.historyLimit),
+      );
       log.debug('Spontane Reaktion', reaction);
       if (reaction.animation !== 'idle') stage.animate(message.guildId, reaction.animation);
       if (reaction.emoji) await message.react(reaction.emoji).catch(() => {});
       if (reaction.comment) {
         stage.say(message.guildId, reaction.comment);
         if (message.channel.isSendable()) await message.channel.send(reaction.comment);
+        this.listen(message.channelId);
       }
     } catch (err) {
       log.warn('Spontane Reaktion fehlgeschlagen', err);

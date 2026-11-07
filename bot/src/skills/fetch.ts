@@ -1,7 +1,7 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { defineSkill } from '../core/skill.ts';
 
-const STICKS = ['ein Stöckchen', 'einen glühenden Ast', 'einen Knochen aus der Unterwelt', 'einen Tennisball (jetzt leicht angekokelt)'];
+const STICKS = ['ein Stöckchen', 'einen glühenden Ast', 'einen Knochen aus dem Warp', 'einen Tennisball (jetzt leicht angekokelt)'];
 
 /** Stöckchen werfen – Klotzi rennt im Call los und bringt es zurück. */
 export default defineSkill({
