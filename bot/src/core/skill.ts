@@ -7,6 +7,7 @@ import type {
 import type OpenAI from 'openai';
 import type { Config } from '../config.ts';
 import type { Logger } from './logger.ts';
+import type { Memory } from './memory.ts';
 import type { Stage } from './stage.ts';
 import type { JsonStore } from './store.ts';
 
@@ -19,6 +20,8 @@ export interface KlotziContext {
   openai: OpenAI;
   /** Die Bühne: steuert Klotzis 3D-Auftritt in den Calls. */
   stage: Stage;
+  /** Klotzis Langzeitgedächtnis (MEMORY.md), steht in jedem Prompt. */
+  memory: Memory;
   /** Persistenter JSON-Speicher (eine Datei pro Namespace). */
   store<T extends object>(namespace: string, initial: T): JsonStore<T>;
   log: Logger;

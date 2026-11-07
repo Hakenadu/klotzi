@@ -60,6 +60,8 @@ export function loadConfig() {
       /** Optional: Reasoning-Aufwand (z. B. minimal, low, medium, high) – leer = Modell-Standard. */
       reasoningEffort: optional('OPENAI_REASONING_EFFORT'),
       baseURL: optional('OPENAI_BASE_URL') || undefined,
+      /** Modell für schnelle Ja/Nein-Entscheidungen über die Decisions API. */
+      decisionModel: optional('OPENAI_DECISION_MODEL', 'gpt-6-luna'),
     },
     chat: {
       /** Kanäle, in denen Klotzi auf jede Nachricht antwortet. */
@@ -70,8 +72,20 @@ export function loadConfig() {
       ambientChance: number('KLOTZI_AMBIENT_CHANCE', 0.15),
       /** Mindestabstand zwischen zwei spontanen Reaktionen pro Kanal (Sekunden). */
       ambientCooldown: number('KLOTZI_AMBIENT_COOLDOWN', 60),
-      /** Wie viele Chat-Nachrichten Klotzi als Kontext liest. */
+      /** Wie viele Chat-Nachrichten Klotzi für spontane Reaktionen und das Nachlauschen liest. */
       historyLimit: number('KLOTZI_HISTORY_LIMIT', 15),
+      /** Für Antworten sieht Klotzi den gesamten Verlauf dieser letzten Stunden. */
+      historyHours: number('KLOTZI_HISTORY_HOURS', 24),
+      /** Obergrenze an Nachrichten im Verlauf (pro Kanal). */
+      historyMaxMessages: number('KLOTZI_HISTORY_MAX_MESSAGES', 500),
+      /** Obergrenze an Zeichen im Verlauf pro Anfrage (schützt vor riesigen Prompts). */
+      historyMaxChars: number('KLOTZI_HISTORY_MAX_CHARS', 60000),
+      /** Nach einer Antwort lauscht Klotzi noch so viele Nachrichten weiter mit. */
+      followUpMessages: number('KLOTZI_FOLLOW_UP_MESSAGES', 2),
+      /** … aber höchstens so viele Minuten lang (0 = unbegrenzt). */
+      followUpMinutes: number('KLOTZI_FOLLOW_UP_MINUTES', 15),
+      /** Ab dieser Wahrscheinlichkeit (0–1) gilt eine Nachricht als an Klotzi gerichtet. */
+      followUpThreshold: number('KLOTZI_FOLLOW_UP_THRESHOLD', 0.5),
       /** Cooldown pro User für direkte Antworten (Sekunden). */
       userCooldown: number('KLOTZI_USER_COOLDOWN', 3),
     },
@@ -80,6 +94,12 @@ export function loadConfig() {
       enabled: list('KLOTZI_SKILLS'),
       /** Diese Skills nie laden. */
       disabled: list('KLOTZI_DISABLED_SKILLS'),
+    },
+    memory: {
+      /** Maximale Anzahl an Erinnerungen in MEMORY.md. */
+      maxEntries: number('KLOTZI_MEMORY_MAX_ENTRIES', 80),
+      /** Maximale Gesamtlänge der Erinnerungen (Zeichen). */
+      maxChars: number('KLOTZI_MEMORY_MAX_CHARS', 8000),
     },
     voice: {
       /** Nur diese Sprach-Channels betreten (leer = alle, die Klotzi betreten darf). */

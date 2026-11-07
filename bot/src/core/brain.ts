@@ -14,6 +14,8 @@ export interface ChatLine {
   author: string;
   fromKlotzi: boolean;
   content: string;
+  /** Zeitpunkt der Nachricht (ms seit 1970), falls bekannt. */
+  at?: number;
 }
 
 /** Spontane, meist nonverbale Reaktion auf eine Chat-Nachricht. */
@@ -55,19 +57,36 @@ export class Brain {
   private async instructions(situation: Situation): Promise<string> {
     const now = new Date().toLocaleString('de-DE', { timeZone: 'Europe/Berlin' });
     const skillPrompts = await this.skills.prompts(situation, this.ctx);
+    const hours = this.ctx.config.chat?.historyHours ?? 24;
     return [
       PERSONA,
       `Aktuelle Zeit (Europe/Berlin): ${now}.`,
-      `Du sprichst gerade mit ${situation.userName}.`,
+      `Du siehst den Chatverlauf dieses Kanals der letzten ${hours} Stunden (Zeitangaben in eckigen Klammern). ` +
+        `Beziehe dich vor allem auf die neueste Nachricht, nutze den Rest als Kontext.`,
+      `Du sprichst gerade mit ${situation.userName} (Discord-ID ${situation.userId}).`,
+      this.ctx.memory.prompt(),
       ...skillPrompts,
     ].join('\n\n');
+  }
+
+  /** Zeitstempel für den Verlauf, z. B. "Sa 14:03". */
+  static formatTime(at: number): string {
+    return new Date(at).toLocaleString('de-DE', {
+      timeZone: 'Europe/Berlin',
+      weekday: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   }
 
   private static historyInput(history: ChatLine[]): ResponseInputItem[] {
     return history.map((line) =>
       line.fromKlotzi
         ? { role: 'assistant', content: line.content }
-        : { role: 'user', content: `${line.author}: ${line.content}` },
+        : {
+            role: 'user',
+            content: `${line.at !== undefined ? `[${Brain.formatTime(line.at)}] ` : ''}${line.author}: ${line.content}`,
+          },
     );
   }
 
@@ -111,6 +130,45 @@ export class Brain {
       this.ctx.log.warn(`Tool ${call.name} fehlgeschlagen`, err);
       return { error: err instanceof Error ? err.message : String(err) };
     }
+  }
+
+  /**
+   * Klotzi hat gerade etwas gesagt und lauscht noch mit: Bezieht sich die
+   * neueste Nachricht (ohne dass sein Name fällt) trotzdem auf ihn?
+   * Nutzt die Decisions API und liefert eine Wahrscheinlichkeit (0–1).
+   */
+  async isAboutKlotzi(history: ChatLine[]): Promise<number> {
+    const last = history.at(-1);
+    if (!last || last.fromKlotzi) return 0;
+    const decision = await this.ctx.openai.decisions.create({
+      model: this.ctx.config.openai.decisionModel,
+      input: [
+        {
+          role: 'developer',
+          content:
+            'Ausschnitt aus einem Discord-Chat. "Klotzi" ist ein Bot (ein riesiger, verspielter Höllenhund), ' +
+            'seine eigenen Nachrichten sind die Assistant-Nachrichten. Er hat gerade selbst etwas geschrieben.',
+        },
+        ...history.map((line) =>
+          line.fromKlotzi
+            ? ({ role: 'assistant', content: line.content } as const)
+            : ({ role: 'user', content: `${line.author}: ${line.content}` } as const),
+        ),
+      ],
+      questions: [
+        {
+          type: 'predicate',
+          name: 'addressed_to_klotzi',
+          instructions:
+            'Ist die LETZTE Nachricht an Klotzi gerichtet oder bezieht sie sich so direkt auf ihn ' +
+            '(z. B. Antwort auf seine Frage, Reaktion auf das, was er gesagt hat, Bitte oder Frage an ihn), ' +
+            'dass Klotzi darauf antworten sollte? Unterhalten sich die Leute nur untereinander über etwas ' +
+            'anderes, ist die Antwort nein.',
+        },
+      ],
+    });
+    const answer = decision.answers.find((a) => a.name === 'addressed_to_klotzi') ?? decision.answers[0];
+    return answer?.type === 'predicate' ? answer.probability : 0;
   }
 
   /**

@@ -91,14 +91,14 @@ window.addEventListener('keydown', (e) => {
   const index = keys.indexOf(e.key);
   if (index >= 0 && ANIMATION_NAMES[index]) klotzi.play(ANIMATION_NAMES[index]);
   if (e.key === 't') klotzi.setThinking(!(klotzi.currentAnimation === 'think'));
-  if (e.key === 's') bubble.say('Wuff! Ich bin Klotzi, der flauschigste Höllenhund der ganzen Unterwelt! 🔥');
+  if (e.key === 's') bubble.say('Wuff! Ich bin Klotzi, der flauschigste Höllenhund des ganzen Warp! 🔥');
 });
 
 // ── Demo-Modus: Klotzi zeigt, was er kann ─────────────────────
 const DEMO_LINES = [
   'Wuff! Ich bin Klotzi! 🔥',
   'Hat hier jemand Leckerli gesagt?',
-  'Ich bin ein gefürchteter Wächter der Unterwelt. Grrr… *wedelt*',
+  'Ich bin ein gefürchteter Dämonenhund des Warp. Grrr… *wedelt*',
   'Wirf das Stöckchen! Bitte bitte bitte!',
   'Lava-Bad gefällig? Nein? Schade. 🐾',
 ];
