@@ -186,6 +186,7 @@ Jede Antwort öffnet das Lauschfenster neu.
 | `dice`   | `/wuerfeln` und Tool `roll_dice` (`d20`, `2d6+3`, …) mit echten Zufallszahlen          |
 | `clock`  | Tool `get_time` für Uhrzeit und Datum in beliebigen Zeitzonen                          |
 | `memory` | Tools `remember` / `revise_memory` / `forget_memory`: Klotzi pflegt seine `MEMORY.md`     |
+| `image`  | Tool `generate_image`: Klotzi malt Bilder (`gpt-image-2.5-sunburst`) und hängt sie an seine Antwort, wenn danach gefragt wird oder es wirklich hilft |
 | `voice`  | Geht automatisch in den Sprach-Channel, in dem die meisten sind, und verlässt ihn, wenn er leer ist; spielt dort die Geräusche zu seinen Animationen |
 
 Der Voice-Skill braucht keine Audiodateien und kein FFmpeg: Die Geräusche werden wie in der
@@ -193,6 +194,11 @@ Activity synthetisiert, nur eben als PCM auf dem Server. Steuern lässt er sich 
 `KLOTZI_VOICE_CHANNELS` (nur diese Channel-IDs), `KLOTZI_VOICE_SOUNDS=false` (still dabeisitzen)
 und `KLOTZI_VOICE_VOLUME` (0–1). Klotzi tritt stummgeschaltet für eingehendes Audio bei
 (*self-deaf*) – er hört nicht mit. Ganz abschalten: `KLOTZI_DISABLED_SKILLS=voice`.
+
+Der Bild-Skill nutzt die **OpenAI Images API** mit `OPENAI_IMAGE_MODEL` (Standard
+`gpt-image-2.5-sunburst`) und `OPENAI_IMAGE_QUALITY` (Standard `medium`). Pro Antwort malt
+Klotzi höchstens ein Bild, pro Kanal höchstens eins alle `KLOTZI_IMAGE_COOLDOWN` Sekunden (60).
+Schickt das Modell einen Fehler zurück (z. B. Moderation), erfährt Klotzi das und antwortet ohne Bild.
 
 Skills lassen sich mit `KLOTZI_SKILLS=dice,emote` (nur diese) oder
 `KLOTZI_DISABLED_SKILLS=memory` (alle außer diesen) steuern.

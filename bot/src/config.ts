@@ -63,6 +63,14 @@ export function loadConfig() {
       /** Modell für schnelle Ja/Nein-Entscheidungen über die Decisions API. */
       decisionModel: optional('OPENAI_DECISION_MODEL', 'gpt-6-luna'),
     },
+    images: {
+      /** Modell für Bilder, die Klotzi an seine Antworten hängt. */
+      model: optional('OPENAI_IMAGE_MODEL', 'gpt-image-2.5-sunburst'),
+      /** Qualität: low, medium, high, xhigh, max oder auto. */
+      quality: optional('OPENAI_IMAGE_QUALITY', 'medium'),
+      /** Mindestabstand zwischen zwei Bildern pro Kanal (Sekunden). */
+      cooldown: number('KLOTZI_IMAGE_COOLDOWN', 60),
+    },
     chat: {
       /** Kanäle, in denen Klotzi auf jede Nachricht antwortet. */
       channelIds: list('KLOTZI_CHAT_CHANNELS'),

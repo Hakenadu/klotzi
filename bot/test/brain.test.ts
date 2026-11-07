@@ -13,6 +13,7 @@ import { SkillRegistry } from '../src/core/skill-registry.ts';
 import { Memory } from '../src/core/memory.ts';
 import { Stage } from '../src/core/stage.ts';
 import emote from '../src/skills/emote.ts';
+import image, { resetImageCooldowns } from '../src/skills/image.ts';
 
 /** Attrappe der Responses API, die vorbereitete Ausgaben der Reihe nach zurückgibt. */
 function fakeOpenAI(outputs: unknown[][], requests: any[]): OpenAI {
@@ -69,7 +70,7 @@ test('Brain führt Tool-Aufrufe aus und schickt Animationen auf die Bühne', asy
     [{ author: 'Lisa', fromKlotzi: false, content: 'Hallo Klotzi!' }],
   );
 
-  assert.equal(answer, 'Wuff! Hallo Lisa! 🔥');
+  assert.deepEqual(answer, { text: 'Wuff! Hallo Lisa! 🔥', files: [] });
   assert.deepEqual(events, [{ type: 'animate', animation: 'happy', intensity: undefined }]);
   assert.equal(requests.length, 2);
   const [first, second] = requests;
@@ -102,7 +103,7 @@ test('Fehler in Tools landen als Ergebnis beim Modell statt den Bot abstürzen z
     }),
   );
   const answer = await new Brain(context(openai), skills).reply({ guildId: null, channelId: 'c', userId: 'u', userName: 'X' }, []);
-  assert.equal(answer, 'Ups.');
+  assert.equal(answer.text, 'Ups.');
   assert.match(requests[1].input.at(-1).output, /kaputt!/);
 });
 
@@ -171,4 +172,50 @@ test('isAboutKlotzi fragt die Decisions API und liefert die Wahrscheinlichkeit',
   // letzte Nachricht von Klotzi selbst → gar nicht erst fragen
   assert.equal(await refused.isAboutKlotzi(history.slice(0, 1)), 0);
   assert.equal(bodies.length, 2);
+});
+
+test('Klotzi malt per Tool ein Bild und hängt es an die Antwort', async () => {
+  resetImageCooldowns();
+  const requests: any[] = [];
+  const imageRequests: any[] = [];
+  const openai = fakeOpenAI(
+    [
+      [call('img', 'generate_image', '{"prompt":"Ein Höllenhund mit Sonnenbrille","format":"quer"}')],
+      [call('img2', 'generate_image', '{"prompt":"Noch eins"}')],
+      [message('Hier, frisch aus dem Höllenfeuer! 🎨')],
+    ],
+    requests,
+  );
+  (openai as any).images = {
+    generate: async (body: unknown) => {
+      imageRequests.push(body);
+      return { created: 0, data: [{ b64_json: Buffer.from('PNG!').toString('base64') }] };
+    },
+  };
+  const ctx = context(openai);
+  (ctx.config as any).images = { model: 'gpt-image-2.5-sunburst', quality: 'medium', cooldown: 60 };
+  const skills = new SkillRegistry();
+  skills.register(image);
+
+  const answer = await new Brain(ctx, skills).reply({ guildId: '1', channelId: 'bilder', userId: 'u', userName: 'Lisa' }, []);
+
+  assert.equal(answer.text, 'Hier, frisch aus dem Höllenfeuer! 🎨');
+  assert.equal(answer.files.length, 1, 'höchstens ein Bild pro Antwort');
+  assert.equal(answer.files[0]!.name, 'klotzi.png');
+  assert.equal(answer.files[0]!.data.toString(), 'PNG!');
+  assert.equal(imageRequests.length, 1);
+  assert.equal(imageRequests[0].model, 'gpt-image-2.5-sunburst');
+  assert.equal(imageRequests[0].size, '1536x1024');
+  assert.match(requests[2].input.at(-1).output, /schon ein Bild/);
+
+  // Cooldown pro Kanal
+  const again = fakeOpenAI([[call('img3', 'generate_image', '{"prompt":"Nochmal"}')], [message('Später!')]], requests);
+  (again as any).images = (openai as any).images;
+  const second = await new Brain({ ...ctx, openai: again }, skills).reply(
+    { guildId: '1', channelId: 'bilder', userId: 'u', userName: 'Lisa' },
+    [],
+  );
+  assert.equal(second.files.length, 0);
+  assert.equal(imageRequests.length, 1);
+  assert.match(requests.at(-1).input.at(-1).output, /Pause/);
 });

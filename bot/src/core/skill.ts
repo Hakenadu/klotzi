@@ -39,7 +39,22 @@ export interface Situation {
   message?: Message;
 }
 
-export type ToolContext = KlotziContext & Situation;
+/** Eine Datei, die Klotzi an seine Antwort hängt (z. B. ein generiertes Bild). */
+export interface ReplyFile {
+  /** Dateiname inkl. Endung, z. B. `klotzi.png`. */
+  name: string;
+  data: Buffer;
+  /** Alternativtext für Discord. */
+  description?: string;
+}
+
+export type ToolContext = KlotziContext &
+  Situation & {
+    /** Hängt eine Datei an die Antwort, die Klotzi gerade formuliert. */
+    attach(file: ReplyFile): void;
+    /** Alle bisher an diese Antwort gehängten Dateien. */
+    attachments(): readonly ReplyFile[];
+  };
 
 /** JSON-Schema für die Parameter eines Tools (OpenAI Function Calling). */
 export interface JsonSchemaObject {
