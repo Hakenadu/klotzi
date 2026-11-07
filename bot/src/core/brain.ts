@@ -6,7 +6,7 @@ import type {
 } from 'openai/resources/responses/responses';
 import type { ReasoningEffort } from 'openai/resources/shared';
 import { PERSONA, ANIMATION_GUIDE } from './persona.ts';
-import type { KlotziContext, Situation } from './skill.ts';
+import type { KlotziContext, ReplyFile, Situation } from './skill.ts';
 import type { SkillRegistry } from './skill-registry.ts';
 
 /** Eine Zeile aus dem Chatverlauf. */
@@ -23,6 +23,12 @@ export interface Reaction {
   animation: AnimationName;
   emoji: string | null;
   comment: string | null;
+}
+
+/** Klotzis Antwort: Text und optional angehängte Dateien (z. B. generierte Bilder). */
+export interface Reply {
+  text: string;
+  files: ReplyFile[];
 }
 
 const MAX_TOOL_ROUNDS = 5;
@@ -91,8 +97,9 @@ export class Brain {
   }
 
   /** Eine Antwort auf den Chat formulieren (inkl. Tool-Aufrufen der Skills). */
-  async reply(situation: Situation, history: ChatLine[]): Promise<string> {
+  async reply(situation: Situation, history: ChatLine[]): Promise<Reply> {
     const { openai, log } = this.ctx;
+    const files: ReplyFile[] = [];
     const instructions = await this.instructions(situation);
     const input: ResponseInputItem[] = Brain.historyInput(history);
     const tools = this.skills.openAiTools();
@@ -107,25 +114,33 @@ export class Brain {
       });
 
       const calls = response.output.filter((item): item is ResponseFunctionToolCall => item.type === 'function_call');
-      if (calls.length === 0) return response.output_text?.trim() || '*wedelt verlegen mit dem Schwanz* 🐾';
+      if (calls.length === 0) {
+        const text = response.output_text?.trim() || (files.length ? '' : '*wedelt verlegen mit dem Schwanz* 🐾');
+        return { text, files };
+      }
 
       // Ausgabe (Reasoning, Tool-Aufrufe) zurück in den Verlauf, dann die Ergebnisse anhängen
       input.push(...(response.output as ResponseInputItem[]));
       for (const call of calls) {
-        const result = await this.runTool(call, situation);
+        const result = await this.runTool(call, situation, files);
         log.debug(`Tool ${call.name}(${call.arguments}) →`, result);
         input.push({ type: 'function_call_output', call_id: call.call_id, output: JSON.stringify(result ?? null) });
       }
     }
-    return '*verheddert sich im eigenen Schwanz* Wuff… da ist was schiefgelaufen. 🔥';
+    return { text: '*verheddert sich im eigenen Schwanz* Wuff… da ist was schiefgelaufen. 🔥', files };
   }
 
-  private async runTool(call: ResponseFunctionToolCall, situation: Situation): Promise<unknown> {
+  private async runTool(call: ResponseFunctionToolCall, situation: Situation, files: ReplyFile[]): Promise<unknown> {
     const tool = this.skills.getTool(call.name);
     if (!tool) return { error: `Unbekanntes Tool ${call.name}` };
     try {
       const args = call.arguments ? JSON.parse(call.arguments) : {};
-      return await tool.execute(args, { ...this.ctx, ...situation });
+      return await tool.execute(args, {
+        ...this.ctx,
+        ...situation,
+        attach: (file) => void files.push(file),
+        attachments: () => files,
+      });
     } catch (err) {
       this.ctx.log.warn(`Tool ${call.name} fehlgeschlagen`, err);
       return { error: err instanceof Error ? err.message : String(err) };

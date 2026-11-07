@@ -1,5 +1,6 @@
 import {
   ApplicationCommandType,
+  AttachmentBuilder,
   ChannelType,
   Client,
   Events,
@@ -290,11 +291,17 @@ export class KlotziBot {
     const typing = setInterval(() => void sendTyping(message), 8000);
     void sendTyping(message);
     try {
-      const answer = await this.brain.reply(situation, await this.history(message));
+      const { text, files } = await this.brain.reply(situation, await this.history(message));
       if (!animated) stage.animate(message.guildId, 'happy');
-      stage.say(message.guildId, answer, situation.userName);
-      const [first, ...rest] = splitMessage(answer);
-      if (first) await message.reply({ content: first, allowedMentions: { repliedUser: false } });
+      if (text) stage.say(message.guildId, text, situation.userName);
+      const [first, ...rest] = splitMessage(text);
+      if (first || files.length) {
+        await message.reply({
+          content: first ?? '',
+          files: files.map((f) => new AttachmentBuilder(f.data, { name: f.name, description: f.description?.slice(0, 1000) })),
+          allowedMentions: { repliedUser: false },
+        });
+      }
       for (const part of rest) if (message.channel.isSendable()) await message.channel.send(part);
       this.listen(message.channelId);
     } catch (err) {

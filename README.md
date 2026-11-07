@@ -187,6 +187,7 @@ Jede Antwort öffnet das Lauschfenster neu.
 | `dice`   | `/wuerfeln` und Tool `roll_dice` (`d20`, `2d6+3`, …) mit echten Zufallszahlen          |
 | `clock`  | Tool `get_time` für Uhrzeit und Datum in beliebigen Zeitzonen                          |
 | `memory` | Tools `remember` / `revise_memory` / `forget_memory`: Klotzi pflegt seine `MEMORY.md`     |
+| `image`  | Tool `generate_image`: Klotzi malt Bilder (`gpt-image-2.5-sunburst`) und hängt sie an seine Antwort, wenn danach gefragt wird oder es wirklich hilft |
 | `invite` | Beginnt ein Sprach-Chat, fragt Klotzi im Chat per Klick-Link, ob er mitmachen darf – der Link startet seine Activity im Call |
 | `voice`  | Geht automatisch in den Sprach-Channel, in dem die meisten sind, und verlässt ihn, wenn er leer ist; spielt dort die Geräusche zu seinen Animationen |
 
@@ -195,6 +196,18 @@ Activity synthetisiert, nur eben als PCM auf dem Server. Steuern lässt er sich 
 `KLOTZI_VOICE_CHANNELS` (nur diese Channel-IDs), `KLOTZI_VOICE_SOUNDS=false` (still dabeisitzen)
 und `KLOTZI_VOICE_VOLUME` (0–1). Klotzi tritt stummgeschaltet für eingehendes Audio bei
 (*self-deaf*) – er hört nicht mit. Ganz abschalten: `KLOTZI_DISABLED_SKILLS=voice`.
+
+Der Bild-Skill nutzt die **OpenAI Images API** mit `OPENAI_IMAGE_MODEL` (Standard
+`gpt-image-2.5-sunburst`) und `OPENAI_IMAGE_QUALITY` (Standard `medium`). Pro Antwort malt
+Klotzi höchstens ein Bild, pro Kanal höchstens eins alle `KLOTZI_IMAGE_COOLDOWN` Sekunden (60).
+Schickt das Modell einen Fehler zurück (z. B. Moderation), erfährt Klotzi das und antwortet ohne Bild.
+
+Kommen bekannte Charaktere im Bild vor, schickt Klotzi ihre **Referenzbilder** über die
+Edit API mit (`input_fidelity: high`), damit sie wiedererkennbar aussehen. Die Bilder liegen in
+[`bot/characters/`](bot/characters) – **Dateiname = Name des Charakters** (z. B. `Gideon.png`).
+Eigene Bilder lassen sich ohne neues Image in `data/characters/` ablegen (gleicher Name überschreibt).
+Spitznamen und Hinweise fürs Malen (z. B. Tana: Shashangli mit weißen statt roten Haaren)
+stehen in [`bot/src/core/characters.ts`](bot/src/core/characters.ts).
 
 Der Invite-Skill fragt, sobald jemand einen leeren Sprach-Channel betritt. Der Link ist eine
 Discord-Einladung mit Klotzis Activity als Ziel: Wer klickt, landet im Sprach-Channel und Klotzis

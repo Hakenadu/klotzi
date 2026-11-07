@@ -43,6 +43,7 @@ function bool(name: string, fallback: boolean): boolean {
 }
 
 export function loadConfig() {
+  const dataDir = path.resolve(ROOT_DIR, optional('KLOTZI_DATA_DIR', 'data'));
   return {
     discord: {
       token: required('DISCORD_TOKEN'),
@@ -62,6 +63,16 @@ export function loadConfig() {
       baseURL: optional('OPENAI_BASE_URL') || undefined,
       /** Modell für schnelle Ja/Nein-Entscheidungen über die Decisions API. */
       decisionModel: optional('OPENAI_DECISION_MODEL', 'gpt-6-luna'),
+    },
+    images: {
+      /** Modell für Bilder, die Klotzi an seine Antworten hängt. */
+      model: optional('OPENAI_IMAGE_MODEL', 'gpt-image-2.5-sunburst'),
+      /** Qualität: low, medium, high, xhigh, max oder auto. */
+      quality: optional('OPENAI_IMAGE_QUALITY', 'medium'),
+      /** Mindestabstand zwischen zwei Bildern pro Kanal (Sekunden). */
+      cooldown: number('KLOTZI_IMAGE_COOLDOWN', 60),
+      /** Referenzbilder bekannter Charaktere (Dateiname = Name); data/characters ergänzt/überschreibt. */
+      characterDirs: [path.join(ROOT_DIR, 'bot', 'characters'), path.join(dataDir, 'characters')],
     },
     chat: {
       /** Kanäle, in denen Klotzi auf jede Nachricht antwortet. */
@@ -121,7 +132,7 @@ export function loadConfig() {
       overlayKey: optional('KLOTZI_OVERLAY_KEY'),
       activityDist: path.join(ROOT_DIR, 'activity', 'dist'),
     },
-    dataDir: path.resolve(ROOT_DIR, optional('KLOTZI_DATA_DIR', 'data')),
+    dataDir,
   };
 }
 
