@@ -10,6 +10,8 @@ interface StageEvents {
   pet: [guildId: string, userId: string | null];
   /** Ein Zuschauer hat die Bühne betreten. */
   join: [guildId: string, userId: string | null];
+  /** Klotzi spielt eine Animation (z. B. damit der Voice-Skill das passende Geräusch abspielt). */
+  animate: [guildId: string, animation: AnimationName, intensity: number | undefined];
 }
 
 /**
@@ -48,6 +50,7 @@ export class Stage extends EventEmitter<StageEvents> {
 
   animate(guildId: string | null | undefined, animation: AnimationName, intensity?: number): void {
     this.broadcast(guildId, { type: 'animate', animation, intensity });
+    if (guildId) this.emit('animate', guildId, animation, intensity);
   }
 
   say(guildId: string | null | undefined, text: string, replyTo?: string): void {

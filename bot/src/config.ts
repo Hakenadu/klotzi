@@ -81,6 +81,14 @@ export function loadConfig() {
       /** Diese Skills nie laden. */
       disabled: list('KLOTZI_DISABLED_SKILLS'),
     },
+    voice: {
+      /** Nur diese Sprach-Channels betreten (leer = alle, die Klotzi betreten darf). */
+      channelIds: list('KLOTZI_VOICE_CHANNELS'),
+      /** Geräusche (Bellen, Jaulen …) im Sprach-Channel abspielen. */
+      sounds: bool('KLOTZI_VOICE_SOUNDS', true),
+      /** Lautstärke der Geräusche (0–1). */
+      volume: number('KLOTZI_VOICE_VOLUME', 0.35),
+    },
     server: {
       port: number('PORT', 3001),
       /** Geheimnis, mit dem die Activity auch im normalen Browser / OBS zuschauen darf. */

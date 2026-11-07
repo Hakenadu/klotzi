@@ -32,6 +32,9 @@ Klotzi besteht deshalb aus zwei Teilen, die über einen WebSocket verbunden sind
 ```
 
 Jeder im Call startet Klotzi über den **Aktivitäten-Button (🚀)** und sieht dieselbe Show.
+Zusätzlich setzt sich Klotzi von selbst zu euch in den **Sprach-Channel** (Skill `voice`):
+Dort ist er als Mitglied sichtbar und bellt, jault und knurrt hörbar für alle – auch für die,
+die die Activity gerade nicht offen haben.
 Alternativ läuft die Bühne auch als **Browser-/OBS-Overlay** (siehe unten).
 
 | Ordner      | Inhalt                                                                      |
@@ -71,7 +74,10 @@ http://localhost:5173 öffnen – dort läuft ein **Demo-Modus**. Mit den Tasten
 3. **OAuth2**: Client-ID → `DISCORD_CLIENT_ID`, Client Secret → `DISCORD_CLIENT_SECRET`.
    Als Redirect `https://127.0.0.1` eintragen (wird von Activities verlangt, aber nicht benutzt).
 4. Bot einladen: OAuth2 → URL Generator → Scopes `bot` + `applications.commands`,
-   Rechte *Nachrichten lesen/senden*, *Reaktionen hinzufügen*, *Nachrichtenverlauf lesen*.
+   Rechte *Kanäle ansehen*, *Nachrichten senden*, *Links einbetten*, *Reaktionen hinzufügen*,
+   *Nachrichtenverlauf lesen* sowie für den Sprach-Chat *Verbinden* und *Sprechen*.
+   Fertiger Link (Rechte-Wert `3230784`):
+   `https://discord.com/oauth2/authorize?client_id=<CLIENT_ID>&scope=bot+applications.commands&permissions=3230784`
 
 5. **General Information → App Icon**: [`assets/icon-512.png`](assets/icon-512.png) hochladen
    (dasselbe Bild eignet sich auch als Bot-Avatar und als Activity-Cover).
@@ -146,6 +152,13 @@ Nach drei Minuten ohne Ereignis rollt er sich zusammen und schläft, bis wieder 
 | `dice`   | `/wuerfeln` und Tool `roll_dice` (`d20`, `2d6+3`, …) mit echten Zufallszahlen          |
 | `clock`  | Tool `get_time` für Uhrzeit und Datum in beliebigen Zeitzonen                          |
 | `memory` | Tools `remember_fact` / `forget_facts`: Klotzi merkt sich Dinge über die Leute         |
+| `voice`  | Geht automatisch in den Sprach-Channel, in dem die meisten sind, und verlässt ihn, wenn er leer ist; spielt dort die Geräusche zu seinen Animationen |
+
+Der Voice-Skill braucht keine Audiodateien und kein FFmpeg: Die Geräusche werden wie in der
+Activity synthetisiert, nur eben als PCM auf dem Server. Steuern lässt er sich mit
+`KLOTZI_VOICE_CHANNELS` (nur diese Channel-IDs), `KLOTZI_VOICE_SOUNDS=false` (still dabeisitzen)
+und `KLOTZI_VOICE_VOLUME` (0–1). Klotzi tritt stummgeschaltet für eingehendes Audio bei
+(*self-deaf*) – er hört nicht mit. Ganz abschalten: `KLOTZI_DISABLED_SKILLS=voice`.
 
 Skills lassen sich mit `KLOTZI_SKILLS=dice,emote` (nur diese) oder
 `KLOTZI_DISABLED_SKILLS=memory` (alle außer diesen) steuern.

@@ -14,7 +14,7 @@ test('alle mitgelieferten Skills laden ohne Namenskonflikte', async () => {
   const registry = new SkillRegistry();
   const loaded = await registry.loadDirectory(skillDir, { enabled: [], disabled: [] });
   const names = loaded.map((s) => s.name);
-  for (const expected of ['core', 'emote', 'dice', 'clock', 'care', 'fetch', 'memory']) {
+  for (const expected of ['core', 'emote', 'dice', 'clock', 'care', 'fetch', 'memory', 'voice']) {
     assert.ok(names.includes(expected), `Skill ${expected} fehlt`);
   }
   assert.ok(registry.getTool('perform_animation'));

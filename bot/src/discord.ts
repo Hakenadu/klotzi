@@ -21,6 +21,8 @@ export function createDiscordClient(): Client {
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.GuildMessageReactions,
       GatewayIntentBits.DirectMessages,
+      // Wer sitzt in welchem Sprach-Channel? (für den Voice-Skill, nicht privilegiert)
+      GatewayIntentBits.GuildVoiceStates,
       // Privilegiert: im Developer-Portal unter "Bot" aktivieren!
       GatewayIntentBits.MessageContent,
     ],
