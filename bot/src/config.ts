@@ -119,6 +119,12 @@ export function loadConfig() {
       sounds: bool('KLOTZI_VOICE_SOUNDS', true),
       /** Lautstärke der Geräusche (0–1). */
       volume: number('KLOTZI_VOICE_VOLUME', 0.35),
+      /** Beim Start eines Sprach-Chats per Link fragen, ob Klotzi (als Activity) mitmachen darf. */
+      invite: bool('KLOTZI_VOICE_INVITE', true),
+      /** Wohin die Frage geht (Kanal-ID) – leer = Text-Chat des Sprach-Channels selbst. */
+      inviteChannelId: optional('KLOTZI_VOICE_INVITE_CHANNEL'),
+      /** Frühestens nach so vielen Minuten fragt Klotzi im selben Channel erneut. */
+      inviteCooldown: number('KLOTZI_VOICE_INVITE_COOLDOWN', 10),
     },
     server: {
       port: number('PORT', 3001),
