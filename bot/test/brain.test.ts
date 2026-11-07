@@ -251,7 +251,7 @@ test('Klotzi schickt Referenzbilder bekannter Charaktere über die Edit API mit'
   assert.equal(answer.files.length, 1);
   assert.equal(edits.length, 1);
   assert.deepEqual(edits[0].image.map((f: File) => f.name), ['Shashangli.jpg', 'Klotzi.png']);
-  assert.equal(edits[0].input_fidelity, 'high');
+  assert.equal(edits[0].input_fidelity, undefined);
   assert.match(edits[0].prompt, /Referenzbild 1 zeigt Tana\. WICHTIG: .*weiße Haare/);
   assert.match(edits[0].prompt, /Referenzbild 2 zeigt Klotzi/);
   // alle mitgelieferten Charaktere stehen im System-Prompt

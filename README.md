@@ -203,7 +203,7 @@ Klotzi höchstens ein Bild, pro Kanal höchstens eins alle `KLOTZI_IMAGE_COOLDOW
 Schickt das Modell einen Fehler zurück (z. B. Moderation), erfährt Klotzi das und antwortet ohne Bild.
 
 Kommen bekannte Charaktere im Bild vor, schickt Klotzi ihre **Referenzbilder** über die
-Edit API mit (`input_fidelity: high`), damit sie wiedererkennbar aussehen. Die Bilder liegen in
+Edit API mit, damit sie wiedererkennbar aussehen. Die Bilder liegen in
 [`bot/characters/`](bot/characters) – **Dateiname = Name des Charakters** (z. B. `Gideon.png`).
 Eigene Bilder lassen sich ohne neues Image in `data/characters/` ablegen (gleicher Name überschreibt).
 Spitznamen und Hinweise fürs Malen (z. B. Tana: Shashangli mit weißen statt roten Haaren)

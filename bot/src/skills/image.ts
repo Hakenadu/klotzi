@@ -130,7 +130,6 @@ ${known}`
             ? await ctx.openai.images.edit({
                 ...common,
                 quality: quality as ImageEditParamsNonStreaming['quality'],
-                input_fidelity: 'high',
                 image: await Promise.all(
                   refs.map(async (c) => toFile(await fs.readFile(c.file), path.basename(c.file), { type: mimeType(c.file) })),
                 ),
