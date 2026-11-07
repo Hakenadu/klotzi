@@ -200,6 +200,13 @@ Der Bild-Skill nutzt die **OpenAI Images API** mit `OPENAI_IMAGE_MODEL` (Standar
 Klotzi höchstens ein Bild, pro Kanal höchstens eins alle `KLOTZI_IMAGE_COOLDOWN` Sekunden (60).
 Schickt das Modell einen Fehler zurück (z. B. Moderation), erfährt Klotzi das und antwortet ohne Bild.
 
+Kommen bekannte Charaktere im Bild vor, schickt Klotzi ihre **Referenzbilder** über die
+Edit API mit (`input_fidelity: high`), damit sie wiedererkennbar aussehen. Die Bilder liegen in
+[`bot/characters/`](bot/characters) – **Dateiname = Name des Charakters** (z. B. `Gideon.png`).
+Eigene Bilder lassen sich ohne neues Image in `data/characters/` ablegen (gleicher Name überschreibt).
+Spitznamen und Hinweise fürs Malen (z. B. dass Shashangli alias Tana inzwischen weiße Haare hat)
+stehen in [`bot/src/core/characters.ts`](bot/src/core/characters.ts).
+
 Skills lassen sich mit `KLOTZI_SKILLS=dice,emote` (nur diese) oder
 `KLOTZI_DISABLED_SKILLS=memory` (alle außer diesen) steuern.
 

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type OpenAI from 'openai';
@@ -193,7 +194,7 @@ test('Klotzi malt per Tool ein Bild und hängt es an die Antwort', async () => {
     },
   };
   const ctx = context(openai);
-  (ctx.config as any).images = { model: 'gpt-image-2.5-sunburst', quality: 'medium', cooldown: 60 };
+  (ctx.config as any).images = { model: 'gpt-image-2.5-sunburst', quality: 'medium', cooldown: 60, characterDirs: [] };
   const skills = new SkillRegistry();
   skills.register(image);
 
@@ -218,4 +219,50 @@ test('Klotzi malt per Tool ein Bild und hängt es an die Antwort', async () => {
   assert.equal(second.files.length, 0);
   assert.equal(imageRequests.length, 1);
   assert.match(requests.at(-1).input.at(-1).output, /Pause/);
+});
+
+test('Klotzi schickt Referenzbilder bekannter Charaktere über die Edit API mit', async () => {
+  resetImageCooldowns();
+  const requests: any[] = [];
+  const edits: any[] = [];
+  const openai = fakeOpenAI(
+    [
+      [call('img', 'generate_image', '{"prompt":"Tana und Klotzi beim Picknick","characters":["Tana","klotzi"]}')],
+      [message('Picknick! 🧺')],
+    ],
+    requests,
+  );
+  (openai as any).images = {
+    generate: async () => assert.fail('ohne Referenzbilder nicht erwartet'),
+    edit: async (body: any) => {
+      edits.push(body);
+      return { created: 0, data: [{ b64_json: Buffer.from('PNG!').toString('base64') }] };
+    },
+  };
+  const ctx = context(openai);
+  const characterDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../characters');
+  (ctx.config as any).images = { model: 'gpt-image-2.5-sunburst', quality: 'medium', cooldown: 0, characterDirs: [characterDir] };
+  const skills = new SkillRegistry();
+  skills.register(image);
+
+  const brain = new Brain(ctx, skills);
+  const answer = await brain.reply({ guildId: '1', channelId: 'ref', userId: 'u', userName: 'Lisa' }, []);
+
+  assert.equal(answer.files.length, 1);
+  assert.equal(edits.length, 1);
+  assert.deepEqual(edits[0].image.map((f: File) => f.name), ['Shashangli.jpg', 'Klotzi.png']);
+  assert.equal(edits[0].input_fidelity, 'high');
+  assert.match(edits[0].prompt, /Referenzbild 1 zeigt Shashangli\. WICHTIG: .*weiße Haare/);
+  assert.match(edits[0].prompt, /Referenzbild 2 zeigt Klotzi/);
+  // alle mitgelieferten Charaktere stehen im System-Prompt
+  for (const name of ['Klotzi', 'Manael', 'Karaski', 'Gideon', 'Shashangli', 'Caldros']) {
+    assert.match(requests[0].instructions, new RegExp(`- ${name}`));
+  }
+
+  // unbekannte Charaktere landen als Fehler beim Modell
+  const unknown = fakeOpenAI([[call('x', 'generate_image', '{"prompt":"x","characters":["Gandalf"]}')], [message('Hm.')]], requests);
+  (unknown as any).images = (openai as any).images;
+  const none = await new Brain({ ...ctx, openai: unknown }, skills).reply({ guildId: '1', channelId: 'ref2', userId: 'u', userName: 'Lisa' }, []);
+  assert.equal(none.files.length, 0);
+  assert.match(requests.at(-1).input.at(-1).output, /Kein Referenzbild von \\"Gandalf\\"/);
 });
