@@ -75,9 +75,10 @@ http://localhost:5173 öffnen – dort läuft ein **Demo-Modus**. Mit den Tasten
    Als Redirect `https://127.0.0.1` eintragen (wird von Activities verlangt, aber nicht benutzt).
 4. Bot einladen: OAuth2 → URL Generator → Scopes `bot` + `applications.commands`,
    Rechte *Kanäle ansehen*, *Nachrichten senden*, *Links einbetten*, *Reaktionen hinzufügen*,
-   *Nachrichtenverlauf lesen* sowie für den Sprach-Chat *Verbinden* und *Sprechen*.
-   Fertiger Link (Rechte-Wert `3230784`):
-   `https://discord.com/oauth2/authorize?client_id=<CLIENT_ID>&scope=bot+applications.commands&permissions=3230784`
+   *Nachrichtenverlauf lesen* sowie für den Sprach-Chat *Verbinden*, *Sprechen* und
+   *Einladung erstellen* (für den Activity-Link, Skill `invite`).
+   Fertiger Link (Rechte-Wert `3230785`):
+   `https://discord.com/oauth2/authorize?client_id=<CLIENT_ID>&scope=bot+applications.commands&permissions=3230785`
 
 5. **General Information → App Icon**: [`assets/icon-512.png`](assets/icon-512.png) hochladen
    (dasselbe Bild eignet sich auch als Bot-Avatar und als Activity-Cover).
@@ -186,6 +187,7 @@ Jede Antwort öffnet das Lauschfenster neu.
 | `dice`   | `/wuerfeln` und Tool `roll_dice` (`d20`, `2d6+3`, …) mit echten Zufallszahlen          |
 | `clock`  | Tool `get_time` für Uhrzeit und Datum in beliebigen Zeitzonen                          |
 | `memory` | Tools `remember` / `revise_memory` / `forget_memory`: Klotzi pflegt seine `MEMORY.md`     |
+| `invite` | Beginnt ein Sprach-Chat, fragt Klotzi im Chat per Klick-Link, ob er mitmachen darf – der Link startet seine Activity im Call |
 | `voice`  | Geht automatisch in den Sprach-Channel, in dem die meisten sind, und verlässt ihn, wenn er leer ist; spielt dort die Geräusche zu seinen Animationen |
 
 Der Voice-Skill braucht keine Audiodateien und kein FFmpeg: Die Geräusche werden wie in der
@@ -193,6 +195,13 @@ Activity synthetisiert, nur eben als PCM auf dem Server. Steuern lässt er sich 
 `KLOTZI_VOICE_CHANNELS` (nur diese Channel-IDs), `KLOTZI_VOICE_SOUNDS=false` (still dabeisitzen)
 und `KLOTZI_VOICE_VOLUME` (0–1). Klotzi tritt stummgeschaltet für eingehendes Audio bei
 (*self-deaf*) – er hört nicht mit. Ganz abschalten: `KLOTZI_DISABLED_SKILLS=voice`.
+
+Der Invite-Skill fragt, sobald jemand einen leeren Sprach-Channel betritt. Der Link ist eine
+Discord-Einladung mit Klotzis Activity als Ziel: Wer klickt, landet im Sprach-Channel und Klotzis
+3D-Auftritt startet direkt. Die Frage landet im Text-Chat des Sprach-Channels
+(`KLOTZI_VOICE_INVITE_CHANNEL` für einen anderen Kanal), frühestens alle
+`KLOTZI_VOICE_INVITE_COOLDOWN` Minuten pro Channel (Standard 10); eine neue Frage ersetzt die alte.
+Klotzi braucht dafür die Berechtigung *Einladung erstellen*. Abschalten: `KLOTZI_VOICE_INVITE=false`.
 
 Skills lassen sich mit `KLOTZI_SKILLS=dice,emote` (nur diese) oder
 `KLOTZI_DISABLED_SKILLS=memory` (alle außer diesen) steuern.
