@@ -1,0 +1,179 @@
+:root {
+  color-scheme: dark;
+  font-family: 'Nunito', 'Trebuchet MS', system-ui, sans-serif;
+  --ember: #ff7a1a;
+  --ink: #1b0f1f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 85%, #4a1630 0%, #1c0d26 45%, #0b0610 100%);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+body.transparent {
+  background: transparent;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+}
+
+#stage {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+}
+
+/* ── Sprechblase ── */
+.bubble {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: min(78vw, 360px);
+  padding: 10px 16px;
+  border-radius: 18px;
+  background: #fff8ef;
+  color: var(--ink);
+  font-size: clamp(13px, 2.4vmin, 18px);
+  font-weight: 700;
+  line-height: 1.35;
+  box-shadow:
+    0 0 0 3px var(--ink),
+    0 6px 0 3px var(--ink),
+    0 0 30px rgba(255, 122, 26, 0.45);
+  pointer-events: none;
+  transition: opacity 0.2s;
+  will-change: transform;
+}
+
+.bubble::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -11px;
+  width: 18px;
+  height: 18px;
+  margin-left: -9px;
+  background: #fff8ef;
+  transform: rotate(45deg);
+  box-shadow: 3px 3px 0 0 var(--ink);
+}
+
+.bubble.hidden {
+  opacity: 0;
+}
+
+/* ── HUD ── */
+#hud {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.no-hud #hud {
+  display: none;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(10, 4, 14, 0.55);
+  color: #f5e6ff;
+  font-size: 12px;
+}
+
+.status b {
+  font-weight: 600;
+}
+
+.status i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ffcc33;
+}
+
+.status[data-state='online'] i {
+  background: #4cff7a;
+  box-shadow: 0 0 8px #4cff7a;
+}
+
+.status[data-state='offline'] i,
+.status[data-state='denied'] i {
+  background: #ff4646;
+}
+
+.status[data-state='demo'] i {
+  background: var(--ember);
+}
+
+.icon-button {
+  pointer-events: auto;
+  border: 0;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  font-size: 16px;
+  background: rgba(10, 4, 14, 0.55);
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  background: rgba(255, 122, 26, 0.35);
+}
+
+.toast {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 90vw;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: rgba(120, 10, 20, 0.85);
+  color: #fff;
+  font-size: 13px;
+  transition: opacity 0.3s;
+}
+
+.toast.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* sehr kleine Fenster (z. B. Discord-Bild-in-Bild) */
+@media (max-height: 300px), (max-width: 420px) {
+  .status b {
+    display: none;
+  }
+  .bubble {
+    padding: 6px 10px;
+    font-size: 12px;
+    border-radius: 12px;
+  }
+  .icon-button {
+    width: 28px;
+    height: 28px;
+    font-size: 13px;
+  }
+}

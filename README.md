@@ -1,1 +1,218 @@
-# klotzi
+# 🔥 Klotzi – der süßeste Höllenhund auf Discord 🐾
+
+Klotzi ist ein Discord-Bot mit eigenem **3D-Auftritt im Sprach-Call**. Er liest im Chat mit,
+antwortet mit Hilfe der **OpenAI-API**, reagiert spontan auf Nachrichten – und zeigt seine
+Gefühle live als animierter Höllenhund im Call: wedeln, bellen (mit Feuer!), schlafen,
+Stöckchen holen, Herzchen, Wutflammen …
+
+Seine Fähigkeiten sind **Skills**: kleine Module, die man einfach in einen Ordner legt.
+
+![Klotzi](docs/klotzi.jpg)
+
+![Klotzis Animationen](docs/animationen.jpg)
+
+---
+
+## Wie kommt ein 3D-Hund in den Call?
+
+Discord-Bots können keine Kamera und keine Bildschirmübertragung senden. Der offizielle Weg,
+interaktive Inhalte in einen Sprach-Call zu bringen, sind **Discord Activities** (Embedded Apps).
+Klotzi besteht deshalb aus zwei Teilen, die über einen WebSocket verbunden sind:
+
+```
+ Discord-Chat ──► Bot (discord.js) ──► OpenAI (Antwort + Tool-Aufrufe der Skills)
+                      │
+                      │  "Bühne": animate / say / thinking  (WebSocket)
+                      ▼
+ Sprach-Call ──► Activity (Three.js) ──► Klotzi in 3D für alle im Call
+                      │
+                      └─► Klick auf Klotzi = streicheln (zurück an den Bot)
+```
+
+Jeder im Call startet Klotzi über den **Aktivitäten-Button (🚀)** und sieht dieselbe Show.
+Alternativ läuft die Bühne auch als **Browser-/OBS-Overlay** (siehe unten).
+
+| Ordner      | Inhalt                                                                      |
+| ----------- | --------------------------------------------------------------------------- |
+| `bot/`      | Discord-Bot, OpenAI-„Gehirn“, Skill-System, HTTP-/WebSocket-Server          |
+| `activity/` | Die 3D-Activity (Vite + Three.js + Discord Embedded App SDK)                |
+| `shared/`   | Gemeinsames Protokoll (Animationen, Events) für Bot und Activity            |
+
+Klotzi selbst ist **komplett prozedural** aus abgerundeten „Klötzen“ gebaut (daher der Name):
+kein 3D-Modell zum Herunterladen, jedes Körperteil ist ein eigenes Gelenk. Toon-Shading,
+Bloom-Leuchten, Partikelfeuer, schwebende Symbole und synthetisierte Bell-Geräusche
+(Web Audio) sind alle im Code.
+
+---
+
+## Schnellstart
+
+Voraussetzung: **Node.js ≥ 22.4**
+
+```bash
+npm install
+cp .env.example .env   # ausfüllen, siehe unten
+npm run build          # Activity bauen
+npm start              # Bot + Bühne starten (Port 3001)
+```
+
+Nur die 3D-Animation ansehen, ganz ohne Discord: `npm run dev:activity` und
+http://localhost:5173 öffnen – dort läuft ein **Demo-Modus**. Mit den Tasten
+`1`–`0`, `q`, `w`, `e`, `r` lassen sich alle Animationen auslösen, `t` = Nachdenken,
+`s` = Sprechblase. Mit der Maus folgt Klotzi deinem Zeiger, ein Klick streichelt ihn.
+
+### 1. Discord-App einrichten
+
+1. Im [Developer Portal](https://discord.com/developers/applications) eine App anlegen.
+2. **Bot**: Token erzeugen → `DISCORD_TOKEN`. Den privilegierten Intent
+   **Message Content Intent** aktivieren (sonst kann Klotzi den Chat nicht lesen).
+3. **OAuth2**: Client-ID → `DISCORD_CLIENT_ID`, Client Secret → `DISCORD_CLIENT_SECRET`.
+   Als Redirect `https://127.0.0.1` eintragen (wird von Activities verlangt, aber nicht benutzt).
+4. Bot einladen: OAuth2 → URL Generator → Scopes `bot` + `applications.commands`,
+   Rechte *Nachrichten lesen/senden*, *Reaktionen hinzufügen*, *Nachrichtenverlauf lesen*.
+
+### 2. Activity aktivieren
+
+1. **Activities → Settings**: Activities aktivieren (ggf. auch für Mobile).
+2. **Activities → URL Mappings**: Root-Mapping `/` → die öffentliche Adresse deines Servers
+   **ohne** `https://`, z. B. `klotzi.example.com`.
+3. Discord legt automatisch einen *Entry-Point*-Command an. Klotzi lässt ihn beim Registrieren
+   seiner eigenen Slash-Commands in Ruhe.
+
+Zum lokalen Entwickeln braucht Discord eine öffentliche HTTPS-Adresse, z. B. mit einem Tunnel:
+
+```bash
+npm run dev                                        # Bot (3001) + Vite-Dev-Server (5173)
+cloudflared tunnel --url http://localhost:5173     # Adresse als URL-Mapping eintragen
+```
+
+Der Vite-Dev-Server leitet `/api` und `/ws` an den Bot weiter. In Produktion liefert der Bot
+die gebaute Activity selbst aus – dann zeigt das URL-Mapping direkt auf Port 3001.
+
+### 3. OpenAI
+
+`OPENAI_API_KEY` setzen; das Modell ist über `OPENAI_MODEL` frei wählbar
+(Standard `gpt-4.1-mini`). Über `OPENAI_BASE_URL` lassen sich auch kompatible APIs nutzen.
+
+### Docker
+
+```bash
+docker build -t klotzi .
+docker run --env-file .env -p 3001:3001 -v klotzi-data:/app/data klotzi
+```
+
+---
+
+## Was Klotzi im Chat macht
+
+| Situation                                                | Reaktion                                                                 |
+| -------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Erwähnung, Antwort auf Klotzi, DM, „Klotzi“ im Text      | Liest die letzten Nachrichten, antwortet per OpenAI, spielt eine Animation |
+| Nachricht in einem `KLOTZI_CHAT_CHANNELS`-Kanal          | antwortet immer                                                          |
+| beliebige andere Nachricht (Chance `KLOTZI_AMBIENT_CHANCE`) | spontane Reaktion: Emoji + Animation, selten ein kurzer Kommentar       |
+| jede Nachricht                                           | Klotzi spitzt im Call kurz die Ohren                                     |
+| während OpenAI rechnet                                   | Klotzi legt im Call nachdenklich den Kopf schief                          |
+
+Seine Antworten erscheinen zusätzlich als **Sprechblase** über seinem Kopf (mit Mundbewegung).
+Nach drei Minuten ohne Ereignis rollt er sich zusammen und schläft, bis wieder etwas passiert.
+
+### Mitgelieferte Skills
+
+| Skill    | Kann                                                                                   |
+| -------- | -------------------------------------------------------------------------------------- |
+| `core`   | `/klotzi` – Vorstellung und Übersicht aller geladenen Skills                           |
+| `emote`  | Tool `perform_animation`: das Modell wählt selbst die passende 3D-Animation            |
+| `care`   | `/leckerli`, `/streicheln`, Streicheln per Klick im Call; merkt sich den Lieblingsmenschen |
+| `fetch`  | `/stoeckchen` – Klotzi rennt im Call los und bringt das Stöckchen zurück                |
+| `dice`   | `/wuerfeln` und Tool `roll_dice` (`d20`, `2d6+3`, …) mit echten Zufallszahlen          |
+| `clock`  | Tool `get_time` für Uhrzeit und Datum in beliebigen Zeitzonen                          |
+| `memory` | Tools `remember_fact` / `forget_facts`: Klotzi merkt sich Dinge über die Leute         |
+
+Skills lassen sich mit `KLOTZI_SKILLS=dice,emote` (nur diese) oder
+`KLOTZI_DISABLED_SKILLS=memory` (alle außer diesen) steuern.
+
+---
+
+## Eigene Skills schreiben
+
+Jede Datei in [`bot/src/skills/`](bot/src/skills) wird beim Start automatisch geladen
+(Dateien mit `_` am Anfang werden übersprungen – gut für Hilfsfunktionen).
+Ein Skill kann beliebig viele dieser Bausteine kombinieren:
+
+| Baustein    | Zweck                                                                                  |
+| ----------- | -------------------------------------------------------------------------------------- |
+| `prompt`    | Text (oder Funktion) für Klotzis System-Prompt, z. B. Wissen über den aktuellen User    |
+| `tools`     | Funktionen, die das Sprachmodell selbstständig aufrufen kann (OpenAI Function Calling)  |
+| `commands`  | Slash-Commands                                                                         |
+| `onMessage` | Hook für jede Chat-Nachricht; `true` zurückgeben = Nachricht ist erledigt              |
+| `setup`     | einmalig beim Start, z. B. um auf Bühnen-Events (`pet`, `join`) zu hören                |
+
+Über den Kontext hat jeder Skill Zugriff auf den Discord-Client, OpenAI, einen persistenten
+JSON-Speicher (`ctx.store`) und die **Bühne** (`ctx.stage.animate(...)`, `ctx.stage.say(...)`).
+
+Beispiel – ein Wetter-Skill (`bot/src/skills/weather.ts`):
+
+```ts
+import { defineSkill, defineTool } from '../core/skill.ts';
+
+export default defineSkill({
+  name: 'weather',
+  description: 'Schnüffelt das Wetter für beliebige Orte.',
+  prompt: 'Wenn jemand nach dem Wetter fragt, benutze das Tool "get_weather".',
+  tools: [
+    defineTool<{ city: string }>({
+      name: 'get_weather',
+      description: 'Aktuelles Wetter für eine Stadt',
+      parameters: {
+        type: 'object',
+        properties: { city: { type: 'string' } },
+        required: ['city'],
+      },
+      async execute({ city }, ctx) {
+        const res = await fetch(`https://wttr.in/${encodeURIComponent(city)}?format=j1`);
+        const data = await res.json();
+        if (Number(data.current_condition[0].temp_C) > 30) ctx.stage.animate(ctx.guildId, 'happy'); // Hitze! 🔥
+        return data.current_condition[0];
+      },
+    }),
+  ],
+});
+```
+
+Neustarten – fertig. Klotzi entscheidet selbst, wann er das Tool benutzt.
+
+### Neue Animationen
+
+1. Namen + Beschreibung in [`shared/src/index.ts`](shared/src/index.ts) (`ANIMATIONS`) eintragen –
+   damit kennt auch das Sprachmodell die Animation.
+2. In [`activity/src/klotzi/animations.ts`](activity/src/klotzi/animations.ts) eine Pose-Funktion
+   ergänzen. Eine Animation liefert pro Frame nur die Werte, die sie ändern will
+   (`headTilt`, `tailAmp`, `jaw`, `flame`, …); der Animator blendet weich dorthin und zurück.
+   Effekte (Symbole, Feuerstöße, Geräusche) werden über `cues` und `every` zeitgesteuert ausgelöst.
+
+---
+
+## Browser- und OBS-Modus
+
+Mit gesetztem `KLOTZI_OVERLAY_KEY` kann man Klotzi auch außerhalb von Discord zuschauen:
+
+```
+https://dein-host/?guild=<GUILD_ID>&key=<KLOTZI_OVERLAY_KEY>
+```
+
+Weitere Parameter: `transparent=1` (transparenter Hintergrund, z. B. als OBS-Browserquelle),
+`hud=0` (ohne Statusanzeige), `quality=low` (ohne Bloom, für schwache Geräte).
+
+## Sicherheit
+
+- Die Activity meldet sich per Discord-OAuth an; der Server prüft das Token und ob der User
+  wirklich Mitglied der Guild ist, bevor er Klotzis Auftritte dieser Guild sehen darf.
+- Overlays brauchen den geheimen `KLOTZI_OVERLAY_KEY`.
+- Cooldowns pro User und Kanal begrenzen die OpenAI-Kosten.
+
+## Entwicklung
+
+```bash
+npm run typecheck   # TypeScript für alle Pakete
+npm test            # Tests des Bots (Skills, Gehirn mit OpenAI-Attrappe, WebSocket-Bühne)
+```

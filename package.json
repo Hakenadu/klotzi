@@ -1,0 +1,24 @@
+{
+  "name": "klotzi",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Klotzi – ein süßer Höllenhund als Discord-Bot mit 3D-Auftritt im Call",
+  "type": "module",
+  "workspaces": [
+    "shared",
+    "bot",
+    "activity"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace bot & npm run dev --workspace activity",
+    "dev:bot": "npm run dev --workspace bot",
+    "dev:activity": "npm run dev --workspace activity",
+    "build": "npm run build --workspace activity",
+    "start": "npm run start --workspace bot",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=22.4"
+  }
+}
