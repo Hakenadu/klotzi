@@ -13,7 +13,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 const sounds = new Sounds();
 const klotzi = new Klotzi(sounds);
 const transparent = params.get('transparent') === '1';
-if (transparent) document.body.classList.add('transparent');
+if (transparent) document.documentElement.classList.add('transparent');
 if (params.get('hud') === '0') document.body.classList.add('no-hud');
 
 let stage = new Stage3D($<HTMLCanvasElement>('stage'), klotzi, {

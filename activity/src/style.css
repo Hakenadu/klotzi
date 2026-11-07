@@ -20,7 +20,8 @@ body {
   touch-action: none;
 }
 
-body.transparent {
+.transparent,
+.transparent body {
   background: transparent;
 }
 

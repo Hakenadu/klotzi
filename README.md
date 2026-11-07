@@ -1,3 +1,5 @@
+<img src="assets/icon-512.png" alt="Klotzi" width="128" align="right" />
+
 # 🔥 Klotzi – der süßeste Höllenhund auf Discord 🐾
 
 Klotzi ist ein Discord-Bot mit eigenem **3D-Auftritt im Sprach-Call**. Er liest im Chat mit,
@@ -70,6 +72,9 @@ http://localhost:5173 öffnen – dort läuft ein **Demo-Modus**. Mit den Tasten
    Als Redirect `https://127.0.0.1` eintragen (wird von Activities verlangt, aber nicht benutzt).
 4. Bot einladen: OAuth2 → URL Generator → Scopes `bot` + `applications.commands`,
    Rechte *Nachrichten lesen/senden*, *Reaktionen hinzufügen*, *Nachrichtenverlauf lesen*.
+
+5. **General Information → App Icon**: [`assets/icon-512.png`](assets/icon-512.png) hochladen
+   (dasselbe Bild eignet sich auch als Bot-Avatar und als Activity-Cover).
 
 ### 2. Activity aktivieren
 
