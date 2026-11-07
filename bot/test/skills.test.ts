@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import { SkillRegistry } from '../src/core/skill-registry.ts';
 import { defineSkill } from '../src/core/skill.ts';
 import { rollDice } from '../src/skills/dice.ts';
-import { splitMessage } from '../src/discord.ts';
+import { mentionsKlotzi, splitMessage } from '../src/discord.ts';
 import { parseReaction } from '../src/core/brain.ts';
 
 const skillDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '../src/skills');
@@ -67,4 +67,13 @@ test('parseReaction ist robust gegen kaputte Antworten', () => {
   });
   assert.equal(parseReaction('{"animation":"fliegen"}').animation, 'idle');
   assert.equal(parseReaction('kein json').animation, 'idle');
+});
+
+test('Klotzi reagiert auf seinen Namen überall im Text', () => {
+  for (const text of ['Klotzi', 'hey klotzi!', 'KLOTZI komm her', 'Klotzis Ball', 'na du Klotzilein', '@Klotzi was geht']) {
+    assert.ok(mentionsKlotzi(text), text);
+  }
+  for (const text of ['Hallo zusammen', 'Klotz am Bein', 'Kl otzi']) {
+    assert.ok(!mentionsKlotzi(text), text);
+  }
 });

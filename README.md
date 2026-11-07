@@ -132,7 +132,8 @@ Neben `latest` gibt es zu jedem Commit ein Tag `sha-<kurzer-hash>`.
 
 | Situation                                                | Reaktion                                                                 |
 | -------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Erwähnung, Antwort auf Klotzi, DM, „Klotzi“ im Text      | Liest die letzten Nachrichten, antwortet per OpenAI, spielt eine Animation |
+| Erwähnung, Antwort auf Klotzi, DM, „Klotzi“ irgendwo im Text (auch „Klotzis“, „Klotzilein“) | Liest die letzten Nachrichten, antwortet per OpenAI, spielt **immer** eine Animation (wählt das Modell keine, hüpft er fröhlich) |
+| „Klotzi“ während des Cooldowns (3 s pro User)            | keine neue OpenAI-Anfrage, aber Klotzi hüpft im Call trotzdem             |
 | Nachricht in einem `KLOTZI_CHAT_CHANNELS`-Kanal          | antwortet immer                                                          |
 | beliebige andere Nachricht (Chance `KLOTZI_AMBIENT_CHANCE`) | spontane Reaktion: Emoji + Animation, selten ein kurzer Kommentar       |
 | jede Nachricht                                           | Klotzi spitzt im Call kurz die Ohren                                     |

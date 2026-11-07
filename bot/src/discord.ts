@@ -30,6 +30,11 @@ export function createDiscordClient(): Client {
   });
 }
 
+/** Kommt "Klotzi" irgendwo im Text vor – auch in "Klotzis", "@klotzi" oder "Klotzilein"? */
+export function mentionsKlotzi(text: string): boolean {
+  return /klotzi/i.test(text);
+}
+
 /** Teilt lange Antworten in Discord-taugliche Stücke (max. 2000 Zeichen). */
 export function splitMessage(text: string, limit = 2000): string[] {
   const parts: string[] = [];
@@ -121,7 +126,7 @@ export class KlotziBot {
     if (config.chat.channelIds.includes(message.channelId)) return true;
     if (message.mentions.users.has(client.user!.id)) return true;
     if (message.mentions.repliedUser?.id === client.user!.id) return true;
-    return config.chat.respondToName && /\bklotzi\b/i.test(message.content);
+    return config.chat.respondToName && mentionsKlotzi(message.content);
   }
 
   private async onMessage(message: Message): Promise<void> {
@@ -133,7 +138,11 @@ export class KlotziBot {
     if (await this.skills.runMessageHooks(message, this.ctx)) return;
 
     if (this.isAddressed(message)) {
-      if (this.onCooldown(this.userCooldowns, message.author.id, this.ctx.config.chat.userCooldown)) return;
+      if (this.onCooldown(this.userCooldowns, message.author.id, this.ctx.config.chat.userCooldown)) {
+        // keine neue OpenAI-Anfrage, aber in der Activity reagiert Klotzi trotzdem
+        stage.animate(message.guildId, 'happy');
+        return;
+      }
       await this.reply(message);
     } else if (message.guildId && Math.random() < this.ctx.config.chat.ambientChance) {
       if (this.onCooldown(this.ambientCooldowns, message.channelId, this.ctx.config.chat.ambientCooldown)) return;
@@ -183,11 +192,18 @@ export class KlotziBot {
   private async reply(message: Message): Promise<void> {
     const { stage, log } = this.ctx;
     const situation = this.situation(message);
+    // Hat das Modell selbst eine Animation gewählt? Wenn nicht, springt Klotzi trotzdem sichtbar an.
+    let animated = false;
+    const onAnimate = (guildId: string) => {
+      if (guildId === message.guildId) animated = true;
+    };
+    stage.on('animate', onAnimate);
     stage.thinking(message.guildId, true);
     const typing = setInterval(() => void sendTyping(message), 8000);
     void sendTyping(message);
     try {
       const answer = await this.brain.reply(situation, await this.history(message));
+      if (!animated) stage.animate(message.guildId, 'happy');
       stage.say(message.guildId, answer, situation.userName);
       const [first, ...rest] = splitMessage(answer);
       if (first) await message.reply({ content: first, allowedMentions: { repliedUser: false } });
@@ -197,6 +213,7 @@ export class KlotziBot {
       stage.animate(message.guildId, 'confused');
       await message.reply('*jault leise* Mein Höllenfeuer flackert gerade… versuch es gleich nochmal. 🔥').catch(() => {});
     } finally {
+      stage.off('animate', onAnimate);
       clearInterval(typing);
       stage.thinking(message.guildId, false);
     }
