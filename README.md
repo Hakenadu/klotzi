@@ -75,6 +75,8 @@ http://localhost:5173 öffnen – dort läuft ein **Demo-Modus**. Mit den Tasten
 
 5. **General Information → App Icon**: [`assets/icon-512.png`](assets/icon-512.png) hochladen
    (dasselbe Bild eignet sich auch als Bot-Avatar und als Activity-Cover).
+   Unter **Bot → Banner** passt [`assets/banner-680x240.png`](assets/banner-680x240.png)
+   (hochauflösend: [`assets/banner-1360x480.png`](assets/banner-1360x480.png)).
 
 ### 2. Activity aktivieren
 
