@@ -20,7 +20,7 @@ test('alle mitgelieferten Skills laden ohne Namenskonflikte', async () => {
   assert.ok(registry.getTool('perform_animation'));
   assert.ok(registry.getCommand('leckerli'));
   for (const tool of registry.openAiTools()) {
-    assert.equal(tool.function.parameters?.type, 'object');
+    assert.equal(tool.parameters?.type, 'object');
   }
 });
 

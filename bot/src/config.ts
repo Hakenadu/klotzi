@@ -54,8 +54,11 @@ export function loadConfig() {
     },
     openai: {
       apiKey: required('OPENAI_API_KEY'),
-      model: optional('OPENAI_MODEL', 'gpt-4.1-mini'),
-      maxTokens: number('OPENAI_MAX_TOKENS', 600),
+      model: optional('OPENAI_MODEL', 'gpt-6-luna'),
+      /** Obergrenze für Ausgabe-Tokens (inkl. Reasoning-Tokens). */
+      maxTokens: number('OPENAI_MAX_TOKENS', 2000),
+      /** Optional: Reasoning-Aufwand (z. B. minimal, low, medium, high) – leer = Modell-Standard. */
+      reasoningEffort: optional('OPENAI_REASONING_EFFORT'),
       baseURL: optional('OPENAI_BASE_URL') || undefined,
     },
     chat: {

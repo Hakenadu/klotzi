@@ -91,8 +91,11 @@ die gebaute Activity selbst aus – dann zeigt das URL-Mapping direkt auf Port 3
 
 ### 3. OpenAI
 
-`OPENAI_API_KEY` setzen; das Modell ist über `OPENAI_MODEL` frei wählbar
-(Standard `gpt-4.1-mini`). Über `OPENAI_BASE_URL` lassen sich auch kompatible APIs nutzen.
+`OPENAI_API_KEY` setzen. Klotzi nutzt die **Responses API** mit dem Modell `gpt-6-luna`
+(über `OPENAI_MODEL` änderbar). Die Anfragen sind zustandslos (`store: false`): Verlauf und
+Tool-Aufrufe werden jedes Mal mitgeschickt, das Reasoning des Modells wird verschlüsselt
+zwischen den Tool-Runden weitergereicht. Mit `OPENAI_REASONING_EFFORT` (z. B. `low`) lässt sich
+die Antwortzeit im Chat verkürzen. Über `OPENAI_BASE_URL` lassen sich kompatible APIs nutzen.
 
 ### Docker
 
@@ -142,7 +145,7 @@ Ein Skill kann beliebig viele dieser Bausteine kombinieren:
 | Baustein    | Zweck                                                                                  |
 | ----------- | -------------------------------------------------------------------------------------- |
 | `prompt`    | Text (oder Funktion) für Klotzis System-Prompt, z. B. Wissen über den aktuellen User    |
-| `tools`     | Funktionen, die das Sprachmodell selbstständig aufrufen kann (OpenAI Function Calling)  |
+| `tools`     | Funktionen, die das Sprachmodell selbstständig aufrufen kann (Function Calling der Responses API) |
 | `commands`  | Slash-Commands                                                                         |
 | `onMessage` | Hook für jede Chat-Nachricht; `true` zurückgeben = Nachricht ist erledigt              |
 | `setup`     | einmalig beim Start, z. B. um auf Bühnen-Events (`pet`, `join`) zu hören                |

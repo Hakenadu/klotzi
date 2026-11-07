@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { ChatCompletionFunctionTool } from 'openai/resources/chat/completions';
+import type { FunctionTool } from 'openai/resources/responses/responses';
 import type { KlotziContext, Situation, Skill, SkillCommand, SkillTool } from './skill.ts';
 
 export interface SkillFilter {
@@ -76,11 +76,14 @@ export class SkillRegistry {
     return [...this.commands.values()];
   }
 
-  /** Tool-Definitionen im OpenAI-Format. */
-  openAiTools(): ChatCompletionFunctionTool[] {
+  /** Tool-Definitionen im Format der OpenAI Responses API. */
+  openAiTools(): FunctionTool[] {
     return [...this.tools.values()].map((tool) => ({
       type: 'function',
-      function: { name: tool.name, description: tool.description, parameters: tool.parameters as any },
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters as unknown as Record<string, unknown>,
+      strict: false,
     }));
   }
 

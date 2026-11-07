@@ -1,8 +1,10 @@
 import { ANIMATION_NAMES, isAnimationName, type AnimationName } from '@klotzi/shared';
 import type {
-  ChatCompletionMessageParam,
-  ChatCompletionMessageFunctionToolCall,
-} from 'openai/resources/chat/completions';
+  ResponseCreateParamsNonStreaming,
+  ResponseFunctionToolCall,
+  ResponseInputItem,
+} from 'openai/resources/responses/responses';
+import type { ReasoningEffort } from 'openai/resources/shared';
 import { PERSONA, ANIMATION_GUIDE } from './persona.ts';
 import type { KlotziContext, Situation } from './skill.ts';
 import type { SkillRegistry } from './skill-registry.ts';
@@ -25,7 +27,12 @@ const MAX_TOOL_ROUNDS = 5;
 
 /**
  * Klotzis Gehirn: baut aus Persona, Skill-Prompts und Chatverlauf eine
- * Anfrage an OpenAI und führt die Tool-Aufrufe der Skills aus.
+ * Anfrage an die OpenAI Responses API und führt die Tool-Aufrufe der Skills aus.
+ *
+ * Die Anfragen sind zustandslos (`store: false`): der komplette Verlauf inkl.
+ * Tool-Aufrufen wird jedes Mal mitgeschickt. Damit Reasoning-Modelle ihre
+ * Gedanken zwischen den Tool-Runden behalten, wird das verschlüsselte
+ * Reasoning mit angefordert und zurückgereicht.
  */
 export class Brain {
   constructor(
@@ -33,7 +40,19 @@ export class Brain {
     private readonly skills: SkillRegistry,
   ) {}
 
-  private async systemPrompt(situation: Situation): Promise<string> {
+  /** Gemeinsame Parameter aller Anfragen. */
+  private baseParams(maxTokens = this.ctx.config.openai.maxTokens) {
+    const { model, reasoningEffort } = this.ctx.config.openai;
+    return {
+      model,
+      max_output_tokens: maxTokens,
+      store: false,
+      include: ['reasoning.encrypted_content'],
+      ...(reasoningEffort ? { reasoning: { effort: reasoningEffort as ReasoningEffort } } : {}),
+    } satisfies Partial<ResponseCreateParamsNonStreaming>;
+  }
+
+  private async instructions(situation: Situation): Promise<string> {
     const now = new Date().toLocaleString('de-DE', { timeZone: 'Europe/Berlin' });
     const skillPrompts = await this.skills.prompts(situation, this.ctx);
     return [
@@ -44,7 +63,7 @@ export class Brain {
     ].join('\n\n');
   }
 
-  private static historyMessages(history: ChatLine[]): ChatCompletionMessageParam[] {
+  private static historyInput(history: ChatLine[]): ResponseInputItem[] {
     return history.map((line) =>
       line.fromKlotzi
         ? { role: 'assistant', content: line.content }
@@ -54,47 +73,42 @@ export class Brain {
 
   /** Eine Antwort auf den Chat formulieren (inkl. Tool-Aufrufen der Skills). */
   async reply(situation: Situation, history: ChatLine[]): Promise<string> {
-    const messages: ChatCompletionMessageParam[] = [
-      { role: 'system', content: await this.systemPrompt(situation) },
-      ...Brain.historyMessages(history),
-    ];
+    const { openai, log } = this.ctx;
+    const instructions = await this.instructions(situation);
+    const input: ResponseInputItem[] = Brain.historyInput(history);
     const tools = this.skills.openAiTools();
-    const { openai, config, log } = this.ctx;
 
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
       const lastRound = round === MAX_TOOL_ROUNDS;
-      const completion = await openai.chat.completions.create({
-        model: config.openai.model,
-        max_completion_tokens: config.openai.maxTokens,
-        messages,
+      const response = await openai.responses.create({
+        ...this.baseParams(),
+        instructions,
+        input,
         ...(tools.length && !lastRound ? { tools } : {}),
       });
-      const message = completion.choices[0]?.message;
-      if (!message) break;
 
-      const calls = (message.tool_calls ?? []).filter(
-        (c): c is ChatCompletionMessageFunctionToolCall => c.type === 'function',
-      );
-      if (calls.length === 0) return message.content?.trim() || '*wedelt verlegen mit dem Schwanz* 🐾';
+      const calls = response.output.filter((item): item is ResponseFunctionToolCall => item.type === 'function_call');
+      if (calls.length === 0) return response.output_text?.trim() || '*wedelt verlegen mit dem Schwanz* 🐾';
 
-      messages.push({ role: 'assistant', content: message.content ?? null, tool_calls: calls });
+      // Ausgabe (Reasoning, Tool-Aufrufe) zurück in den Verlauf, dann die Ergebnisse anhängen
+      input.push(...(response.output as ResponseInputItem[]));
       for (const call of calls) {
         const result = await this.runTool(call, situation);
-        log.debug(`Tool ${call.function.name}(${call.function.arguments}) →`, result);
-        messages.push({ role: 'tool', tool_call_id: call.id, content: JSON.stringify(result ?? null) });
+        log.debug(`Tool ${call.name}(${call.arguments}) →`, result);
+        input.push({ type: 'function_call_output', call_id: call.call_id, output: JSON.stringify(result ?? null) });
       }
     }
     return '*verheddert sich im eigenen Schwanz* Wuff… da ist was schiefgelaufen. 🔥';
   }
 
-  private async runTool(call: ChatCompletionMessageFunctionToolCall, situation: Situation): Promise<unknown> {
-    const tool = this.skills.getTool(call.function.name);
-    if (!tool) return { error: `Unbekanntes Tool ${call.function.name}` };
+  private async runTool(call: ResponseFunctionToolCall, situation: Situation): Promise<unknown> {
+    const tool = this.skills.getTool(call.name);
+    if (!tool) return { error: `Unbekanntes Tool ${call.name}` };
     try {
-      const args = call.function.arguments ? JSON.parse(call.function.arguments) : {};
+      const args = call.arguments ? JSON.parse(call.arguments) : {};
       return await tool.execute(args, { ...this.ctx, ...situation });
     } catch (err) {
-      this.ctx.log.warn(`Tool ${call.function.name} fehlgeschlagen`, err);
+      this.ctx.log.warn(`Tool ${call.name} fehlgeschlagen`, err);
       return { error: err instanceof Error ? err.message : String(err) };
     }
   }
@@ -103,15 +117,10 @@ export class Brain {
    * Spontane Reaktion auf eine Nachricht, die nicht an Klotzi gerichtet war:
    * eine Animation im Call, optional ein Emoji und selten ein Kommentar.
    */
-  async react(situation: Situation, history: ChatLine[]): Promise<Reaction> {
-    const { openai, config } = this.ctx;
-    const completion = await openai.chat.completions.create({
-      model: config.openai.model,
-      max_completion_tokens: 200,
-      messages: [
-        {
-          role: 'system',
-          content: `${PERSONA}
+  async react(_situation: Situation, history: ChatLine[]): Promise<Reaction> {
+    const response = await this.ctx.openai.responses.create({
+      ...this.baseParams(Math.min(1000, this.ctx.config.openai.maxTokens)),
+      instructions: `${PERSONA}
 
 Du liest gerade im Chat mit, die letzte Nachricht war aber NICHT an dich gerichtet.
 Reagiere wie ein Hund: wähle eine passende Animation für deinen 3D-Auftritt im Call,
@@ -120,12 +129,10 @@ optional ein passendes Emoji als Reaktion auf die Nachricht und nur ganz selten
 
 Animationen:
 ${ANIMATION_GUIDE}`,
-        },
-        ...Brain.historyMessages(history),
-      ],
-      response_format: {
-        type: 'json_schema',
-        json_schema: {
+      input: Brain.historyInput(history),
+      text: {
+        format: {
+          type: 'json_schema',
           name: 'reaction',
           strict: true,
           schema: {
@@ -141,7 +148,7 @@ ${ANIMATION_GUIDE}`,
         },
       },
     });
-    return parseReaction(completion.choices[0]?.message.content);
+    return parseReaction(response.output_text);
   }
 }
 
