@@ -204,7 +204,7 @@ Kommen bekannte Charaktere im Bild vor, schickt Klotzi ihre **Referenzbilder** �
 Edit API mit (`input_fidelity: high`), damit sie wiedererkennbar aussehen. Die Bilder liegen in
 [`bot/characters/`](bot/characters) – **Dateiname = Name des Charakters** (z. B. `Gideon.png`).
 Eigene Bilder lassen sich ohne neues Image in `data/characters/` ablegen (gleicher Name überschreibt).
-Spitznamen und Hinweise fürs Malen (z. B. dass Shashangli alias Tana inzwischen weiße Haare hat)
+Spitznamen und Hinweise fürs Malen (z. B. Tana: Shashangli mit weißen statt roten Haaren)
 stehen in [`bot/src/core/characters.ts`](bot/src/core/characters.ts).
 
 Skills lassen sich mit `KLOTZI_SKILLS=dice,emote` (nur diese) oder

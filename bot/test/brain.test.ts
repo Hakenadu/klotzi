@@ -252,12 +252,20 @@ test('Klotzi schickt Referenzbilder bekannter Charaktere über die Edit API mit'
   assert.equal(edits.length, 1);
   assert.deepEqual(edits[0].image.map((f: File) => f.name), ['Shashangli.jpg', 'Klotzi.png']);
   assert.equal(edits[0].input_fidelity, 'high');
-  assert.match(edits[0].prompt, /Referenzbild 1 zeigt Shashangli\. WICHTIG: .*weiße Haare/);
+  assert.match(edits[0].prompt, /Referenzbild 1 zeigt Tana\. WICHTIG: .*weiße Haare/);
   assert.match(edits[0].prompt, /Referenzbild 2 zeigt Klotzi/);
   // alle mitgelieferten Charaktere stehen im System-Prompt
-  for (const name of ['Klotzi', 'Manael', 'Karaski', 'Gideon', 'Shashangli', 'Caldros']) {
+  for (const name of ['Klotzi', 'Manael', 'Karaski', 'Gideon', 'Shashangli', 'Tana', 'Caldros', 'Tarras']) {
     assert.match(requests[0].instructions, new RegExp(`- ${name}`));
   }
+
+  // Shashangli selbst behält ihre roten Haare
+  resetImageCooldowns();
+  const red = fakeOpenAI([[call('s', 'generate_image', '{"prompt":"Porträt","characters":["Shashangli"]}')], [message('Rot!')]], requests);
+  (red as any).images = (openai as any).images;
+  await new Brain({ ...ctx, openai: red }, skills).reply({ guildId: '1', channelId: 'ref3', userId: 'u', userName: 'Lisa' }, []);
+  assert.equal(edits.at(-1).image[0].name, 'Shashangli.jpg');
+  assert.doesNotMatch(edits.at(-1).prompt, /weiß/);
 
   // unbekannte Charaktere landen als Fehler beim Modell
   const unknown = fakeOpenAI([[call('x', 'generate_image', '{"prompt":"x","characters":["Gandalf"]}')], [message('Hm.')]], requests);

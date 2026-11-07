@@ -29,10 +29,26 @@ const KNOWN: Record<string, Pick<Character, 'aliases' | 'about' | 'imageNote'>> 
     about: 'dein Herrchen, der Psioniker, der dich beschworen hat (im Chat "mseiche")',
   },
   shashangli: {
-    aliases: ['tana'],
-    about: 'wird mittlerweile Tana genannt und hat inzwischen weiße Haare',
+    aliases: [],
+    about: 'mit roten Haaren, so wie früher (heute wird sie Tana genannt, siehe dort)',
+  },
+  tarras: {
+    aliases: ['taras', 'tarras gun', 'taras gun'],
+  },
+};
+
+/**
+ * Charaktere, die ein vorhandenes Referenzbild mitbenutzen, aber anders
+ * gemalt werden (Schlüssel: Name klein geschrieben).
+ */
+const VARIANTS: Record<string, { name: string; base: string } & Pick<Character, 'aliases' | 'about' | 'imageNote'>> = {
+  tana: {
+    name: 'Tana',
+    base: 'shashangli',
+    aliases: [],
+    about: 'so heißt Shashangli heute – sie hat inzwischen weiße Haare',
     imageNote:
-      'WICHTIG: Shashangli (Tana) hat inzwischen schneeweiße Haare. Übernimm Gesicht und Ausstrahlung vom Referenzbild, ' +
+      'WICHTIG: Tana hat schneeweiße Haare. Übernimm Gesicht und Ausstrahlung vom Referenzbild, ' +
       'aber male ihre Haare unbedingt weiß, NICHT rot.',
   },
 };
@@ -60,6 +76,10 @@ export function loadCharacters(...dirs: string[]): Character[] {
         file: path.join(dir, entry),
       });
     }
+  }
+  for (const [key, { base, ...variant }] of Object.entries(VARIANTS)) {
+    const original = byName.get(base);
+    if (original && !byName.has(key)) byName.set(key, { ...variant, file: original.file });
   }
   return [...byName.values()];
 }
