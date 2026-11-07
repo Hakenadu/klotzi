@@ -111,7 +111,7 @@ docker build -t klotzi .
 docker run --env-file .env -p 3001:3001 -v klotzi-data:/app/data klotzi
 ```
 
-Fertige Images (amd64 + arm64) baut eine GitHub Action bei jedem Push nach `main` und
+Fertige Images (linux/amd64) baut eine GitHub Action bei jedem Push nach `main` und
 veröffentlicht sie in der GitHub Container Registry:
 
 ```bash
